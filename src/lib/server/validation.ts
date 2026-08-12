@@ -24,6 +24,118 @@ export class AccountProblem extends Error {
 	}
 }
 
+export type GameError =
+	| 'invalid_game_name'
+	| 'invalid_blinds'
+	| 'invalid_stack'
+	| 'invalid_seats'
+	| 'invalid_turn_seconds'
+	| 'missing_boks_code'
+	| 'invalid_buy_in'
+	| 'invalid_voice_url';
+
+export class GameProblem extends Error {
+	constructor(readonly code: GameError) {
+		super(code);
+	}
+}
+
+export interface GameSettings {
+	name: string;
+	realMoney: boolean;
+	vippsBoksCode: string | null;
+	buyInOre: number | null;
+	smallBlind: number;
+	bigBlind: number;
+	startingStack: number;
+	maxSeats: number;
+	turnSeconds: number;
+	voiceChatUrl: string | null;
+}
+
+/** Parses kroner like "250" or "249,50" into integer øre without float drift. */
+export function parseKronerToOre(raw: string): number {
+	const cleaned = raw.trim().replace(',', '.');
+	if (!/^\d{1,7}(\.\d{1,2})?$/.test(cleaned)) throw new GameProblem('invalid_buy_in');
+	const [kroner, decimals = ''] = cleaned.split('.');
+	return Number(kroner) * 100 + Number(decimals.padEnd(2, '0'));
+}
+
+/**
+ * Validates the game-creation form. Play-money games skip everything to do with
+ * the Vipps Boks, which is why the money fields are only checked when
+ * `realMoney` is set.
+ */
+export function parseGameSettings(raw: Record<string, string>): GameSettings {
+	const name = (raw.name ?? '').trim();
+	if (name.length < 1 || name.length > 60) throw new GameProblem('invalid_game_name');
+
+	const smallBlind = Number(raw.smallBlind);
+	const bigBlind = Number(raw.bigBlind);
+	if (
+		!Number.isInteger(smallBlind) ||
+		!Number.isInteger(bigBlind) ||
+		smallBlind < 1 ||
+		bigBlind < 2 ||
+		smallBlind > bigBlind
+	) {
+		throw new GameProblem('invalid_blinds');
+	}
+
+	const startingStack = Number(raw.startingStack);
+	// Ten big blinds is about the shallowest stack that still plays like poker.
+	if (!Number.isInteger(startingStack) || startingStack < bigBlind * 10) {
+		throw new GameProblem('invalid_stack');
+	}
+
+	const maxSeats = Number(raw.maxSeats);
+	if (!Number.isInteger(maxSeats) || maxSeats < 2 || maxSeats > 9) {
+		throw new GameProblem('invalid_seats');
+	}
+
+	const turnSeconds = Number(raw.turnSeconds);
+	if (!Number.isInteger(turnSeconds) || turnSeconds < 10 || turnSeconds > 120) {
+		throw new GameProblem('invalid_turn_seconds');
+	}
+
+	const realMoney = raw.realMoney === 'on' || raw.realMoney === 'true';
+	let vippsBoksCode: string | null = null;
+	let buyInOre: number | null = null;
+
+	if (realMoney) {
+		vippsBoksCode = (raw.vippsBoksCode ?? '').trim();
+		if (!vippsBoksCode) throw new GameProblem('missing_boks_code');
+		buyInOre = parseKronerToOre(raw.buyInKr ?? '');
+		if (buyInOre <= 0) throw new GameProblem('invalid_buy_in');
+	}
+
+	const voiceRaw = (raw.voiceChatUrl ?? '').trim();
+	let voiceChatUrl: string | null = null;
+	if (voiceRaw) {
+		let parsed: URL;
+		try {
+			parsed = new URL(voiceRaw);
+		} catch {
+			throw new GameProblem('invalid_voice_url');
+		}
+		if (parsed.protocol !== 'https:') throw new GameProblem('invalid_voice_url');
+		voiceChatUrl = parsed.toString();
+	}
+
+	return {
+		name,
+		realMoney,
+		vippsBoksCode,
+		buyInOre,
+		smallBlind,
+		bigBlind,
+		startingStack,
+		maxSeats,
+		turnSeconds,
+		voiceChatUrl
+	};
+}
+
 export function validateUsername(raw: string): string {
 	const username = raw.trim();
 	if (!/^[a-zA-Z0-9_-]{3,20}$/.test(username)) throw new AccountProblem('invalid_username');
