@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import * as schema from '../db/schema';
 import type { Action } from '../../poker/engine';
@@ -76,7 +76,29 @@ export class GameRoom {
 			});
 		}
 
+		// Hand numbering and the button live in memory during play, so they have to
+		// be picked back up from the last recorded hand. Restarting the count would
+		// collide with the unique (game_id, hand_number) index and reset the button.
+		const [last] = await db
+			.select({ handNumber: schema.hand.handNumber, buttonSeat: schema.hand.buttonSeat })
+			.from(schema.hand)
+			.where(eq(schema.hand.gameId, game.id))
+			.orderBy(desc(schema.hand.handNumber))
+			.limit(1);
+
+		room.handNumber = last?.handNumber ?? 0;
+		room.button = last?.buttonSeat ?? -1;
+
 		return room;
+	}
+
+	/**
+	 * Runs timer-driven work without letting a rejection reach the process.
+	 * These callbacks have no caller to catch them, and an unhandled rejection
+	 * here would take down every other table on the server too.
+	 */
+	private detach(label: string, work: () => Promise<unknown>) {
+		work().catch((error) => console.error(`[room ${this.game.code}] ${label} failed`, error));
 	}
 
 	get code() {
@@ -91,7 +113,26 @@ export class GameRoom {
 
 	connect(userId: string) {
 		const player = this.players.get(userId);
-		if (player) player.connections++;
+		if (player) {
+			player.connections++;
+			// Coming back cancels the sit-out that dropping out applied.
+			player.sittingOut = false;
+		}
+		this.maybeResume();
+	}
+
+	/**
+	 * Deals again when a running game has no hand in progress.
+	 *
+	 * Live hand state only exists in memory, so a restart or redeploy leaves a
+	 * running game with none. Without this the table would look permanently
+	 * frozen to everyone who reconnects. The same path covers a table that ran
+	 * out of players and later got one back.
+	 */
+	private maybeResume() {
+		if (this.game.status !== 'running' || this.hand || this.nextHandTimer) return;
+		if (this.readyPlayers().length < 2) return;
+		this.nextHandTimer = setTimeout(() => this.detach('resume', () => this.dealNextHand()), 1500);
 	}
 
 	/** A disconnected player sits out rather than blocking the table. */
@@ -140,6 +181,8 @@ export class GameRoom {
 
 		this.players.set(userId, { userId, username, seat, stack, sittingOut: false, connections: 1 });
 		this.onChange();
+		// Someone joining a running table may be the second player it needed.
+		this.maybeResume();
 	}
 
 	async leave(userId: string) {
@@ -251,13 +294,16 @@ export class GameRoom {
 		this.clearTimers();
 
 		if (this.hand && this.hand.street === 'complete') {
-			void this.settleHand();
+			this.detach('settle', () => this.settleHand());
 			return;
 		}
 
 		if (this.hand && this.hand.toAct !== null) {
 			this.actionDeadline = Date.now() + this.game.turnSeconds * 1000;
-			this.actionTimer = setTimeout(() => void this.actOnTimeout(), this.game.turnSeconds * 1000);
+			this.actionTimer = setTimeout(
+				() => this.detach('action timeout', () => this.actOnTimeout()),
+				this.game.turnSeconds * 1000
+			);
 		} else {
 			this.actionDeadline = null;
 		}
@@ -304,7 +350,10 @@ export class GameRoom {
 
 		this.onChange();
 
-		this.nextHandTimer = setTimeout(() => void this.dealNextHand(), NEXT_HAND_DELAY_MS);
+		this.nextHandTimer = setTimeout(
+			() => this.detach('next hand', () => this.dealNextHand()),
+			NEXT_HAND_DELAY_MS
+		);
 	}
 
 	private async persistNewEvents() {

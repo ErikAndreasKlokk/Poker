@@ -165,7 +165,7 @@
 						isButton={table.button === index}
 						isActing={table.toAct === index}
 						isYou={seat?.userId === table.you.userId}
-						canSit={mySeat === null && table.status === 'lobby'}
+						canSit={mySeat === null && table.status !== 'ended'}
 						clock={table.toAct === index && msLeft !== null
 							? Math.min(1, msLeft / (table.turnSeconds * 1000))
 							: null}
