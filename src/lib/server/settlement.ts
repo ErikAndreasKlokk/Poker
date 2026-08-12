@@ -26,9 +26,17 @@ export interface SettlementLine {
 	userId: string;
 	/** Everything this player put into the Boks, in øre. */
 	paidInOre: number;
-	/** What they take back out, in øre. */
+	/** What they have taken back out, in øre. */
 	paidOutOre: number;
-	/** Positive means they finished the night up. */
+	/**
+	 * What their chips are worth while the session is still running.
+	 *
+	 * Without this a player who has bought in but not yet cashed out looks like
+	 * they are simply down that much, when the money is sitting in front of them.
+	 * Always zero once the session has ended and the chips became a payout.
+	 */
+	onTableOre: number;
+	/** Positive means they are up, counting chips still in play. */
 	netOre: number;
 }
 
@@ -103,22 +111,38 @@ export function distributePool(
 	return amounts;
 }
 
-export function computeLines(rows: readonly LedgerRow[]): SettlementLine[] {
+/**
+ * @param onTableOre what each seated player's chips are currently worth
+ */
+export function computeLines(
+	rows: readonly LedgerRow[],
+	onTableOre: ReadonlyMap<string, number> = new Map()
+): SettlementLine[] {
+	const blank = (userId: string): SettlementLine => ({
+		userId,
+		paidInOre: 0,
+		paidOutOre: 0,
+		onTableOre: 0,
+		netOre: 0
+	});
+
 	const byUser = new Map<string, SettlementLine>();
 
 	for (const row of rows) {
-		const line = byUser.get(row.userId) ?? {
-			userId: row.userId,
-			paidInOre: 0,
-			paidOutOre: 0,
-			netOre: 0
-		};
-
+		const line = byUser.get(row.userId) ?? blank(row.userId);
 		if (row.type === 'cash_out') line.paidOutOre += row.amountOre;
 		else line.paidInOre += row.amountOre;
-
-		line.netOre = line.paidOutOre - line.paidInOre;
 		byUser.set(row.userId, line);
+	}
+
+	for (const [userId, amount] of onTableOre) {
+		const line = byUser.get(userId) ?? blank(userId);
+		line.onTableOre = amount;
+		byUser.set(userId, line);
+	}
+
+	for (const line of byUser.values()) {
+		line.netOre = line.paidOutOre + line.onTableOre - line.paidInOre;
 	}
 
 	return [...byUser.values()].sort((a, b) => b.netOre - a.netOre);
@@ -129,8 +153,13 @@ export function computeLines(rows: readonly LedgerRow[]): SettlementLine[] {
  * @param ended once the session is closed the fee is whatever the Boks actually
  *   kept; while it is still running we can only project it from the rule
  */
-export function computeSettlement(rows: readonly LedgerRow[], ended: boolean): Settlement {
-	const lines = computeLines(rows);
+export function computeSettlement(
+	rows: readonly LedgerRow[],
+	ended: boolean,
+	onTableOre: ReadonlyMap<string, number> = new Map()
+): Settlement {
+	// Once ended there are no chips left in play; everything became a payout.
+	const lines = computeLines(rows, ended ? new Map() : onTableOre);
 	const paidInOre = lines.reduce((sum, line) => sum + line.paidInOre, 0);
 	const payoutOre = lines.reduce((sum, line) => sum + line.paidOutOre, 0);
 

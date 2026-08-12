@@ -108,6 +108,7 @@
 	"settle_summary": "Regnskap",
 	"settle_paid_in": "inn {amount}",
 	"settle_paid_out": "ut {amount}",
+	"settle_on_table": "på bordet {amount}",
 	"settle_play_money": "Dette spillet ble spilt uten penger, så det er ingenting å gjøre opp.",
 	"settle_not_ended": "Spillet pågår fortsatt. Oppgjøret blir endelig når verten avslutter kvelden.",
 

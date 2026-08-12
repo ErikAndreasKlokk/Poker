@@ -1,9 +1,9 @@
 import { error, redirect } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { findGameByCode } from '$lib/server/games';
-import { computeSettlement } from '$lib/server/settlement';
+import { chipsToOre, computeSettlement } from '$lib/server/settlement';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -40,7 +40,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		.where(eq(schema.gamePlayer.gameId, game.id));
 
 	const ended = game.status === 'ended';
-	const { lines, paidInOre, feeOre, payoutOre } = computeSettlement(rows, ended);
+
+	// Chips still in front of seated players. Without these a live session reads
+	// as though everyone is down their whole buy-in.
+	const seated = await db
+		.select({ userId: schema.gamePlayer.userId, stack: schema.gamePlayer.stack })
+		.from(schema.gamePlayer)
+		.where(and(eq(schema.gamePlayer.gameId, game.id), isNull(schema.gamePlayer.leftAt)));
+
+	const onTableOre = new Map(
+		seated.map((row) => [row.userId, chipsToOre(row.stack, game.buyInOre ?? 0, game.startingStack)])
+	);
+
+	const { lines, paidInOre, feeOre, payoutOre } = computeSettlement(rows, ended, onTableOre);
 
 	const byId = new Map(players.map((p) => [p.id, p]));
 

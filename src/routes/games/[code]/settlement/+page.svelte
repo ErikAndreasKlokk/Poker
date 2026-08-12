@@ -86,6 +86,11 @@
 							<span class="block text-xs text-muted">
 								{m.settle_paid_in({ amount: formatOre(line.paidInOre) })}
 								· {m.settle_paid_out({ amount: formatOre(line.paidOutOre) })}
+								{#if line.onTableOre > 0}
+									· <span class="text-gold"
+										>{m.settle_on_table({ amount: formatOre(line.onTableOre) })}</span
+									>
+								{/if}
 							</span>
 						</span>
 						<span

@@ -108,6 +108,7 @@
 	"settle_summary": "Accounts",
 	"settle_paid_in": "in {amount}",
 	"settle_paid_out": "out {amount}",
+	"settle_on_table": "on the table {amount}",
 	"settle_play_money": "This game was played without money, so there is nothing to settle.",
 	"settle_not_ended": "The game is still going. The settlement is final once the host ends the session.",
 

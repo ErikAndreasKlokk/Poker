@@ -185,6 +185,69 @@ describe('computeSettlement', () => {
 	});
 });
 
+describe('chips still in play', () => {
+	/**
+	 * Leaving and rejoining records a buy-in each time and a cash-out each time
+	 * but the last, because that stack is still on the table. Counting only the
+	 * ledger made the player look down a full buy-in.
+	 */
+	const rejoinedRepeatedly: LedgerRow[] = [
+		buyIn('a'),
+		cashOut('a', BUY_IN_ORE),
+		buyIn('a'),
+		cashOut('a', BUY_IN_ORE),
+		buyIn('a') // sat back down and is still there
+	];
+
+	it('counts a seated player as even, not down a buy-in', () => {
+		const onTable = new Map([['a', BUY_IN_ORE]]);
+		const { lines } = computeSettlement(rejoinedRepeatedly, false, onTable);
+		const line = lines.find((l) => l.userId === 'a')!;
+
+		expect(line.paidInOre).toBe(BUY_IN_ORE * 3);
+		expect(line.paidOutOre).toBe(BUY_IN_ORE * 2);
+		expect(line.onTableOre).toBe(BUY_IN_ORE);
+		expect(line.netOre).toBe(0);
+	});
+
+	it('shows a real loss when the stack is short of the buy-in', () => {
+		const { lines } = computeSettlement([buyIn('a')], false, new Map([['a', 6000]]));
+		expect(lines[0].netOre).toBe(6000 - BUY_IN_ORE);
+	});
+
+	it('shows a win when the stack is above the buy-in', () => {
+		const { lines } = computeSettlement([buyIn('a')], false, new Map([['a', 40_000]]));
+		expect(lines[0].netOre).toBe(40_000 - BUY_IN_ORE);
+	});
+
+	it('ignores chips once the session has ended', () => {
+		// A stale stack must not be double-counted next to its own cash-out.
+		const rows = [buyIn('a'), cashOut('a', BUY_IN_ORE)];
+		const { lines } = computeSettlement(rows, true, new Map([['a', BUY_IN_ORE]]));
+
+		expect(lines[0].onTableOre).toBe(0);
+		expect(lines[0].netOre).toBe(0);
+	});
+
+	it('includes someone seated who has no ledger rows yet', () => {
+		const { lines } = computeSettlement([], false, new Map([['newcomer', 5000]]));
+		expect(lines).toHaveLength(1);
+		expect(lines[0].netOre).toBe(5000);
+	});
+
+	it('leaves the table balanced across everyone still playing', () => {
+		const rows = [buyIn('a'), buyIn('b')];
+		const onTable = new Map([
+			['a', 40_000],
+			['b', 10_000]
+		]);
+		const { lines } = computeSettlement(rows, false, onTable);
+
+		// Chips are conserved, so the nets cancel out.
+		expect(lines.reduce((sum, line) => sum + line.netOre, 0)).toBe(0);
+	});
+});
+
 describe('formatOre', () => {
 	it.each([
 		[25000, '250,00 kr'],
