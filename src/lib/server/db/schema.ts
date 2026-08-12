@@ -1,5 +1,6 @@
 import {
 	boolean,
+	customType,
 	index,
 	integer,
 	jsonb,
@@ -10,6 +11,11 @@ import {
 	timestamp,
 	unique
 } from 'drizzle-orm/pg-core';
+
+/** Postgres `bytea`; drizzle has no built-in for it. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType: () => 'bytea'
+});
 
 /**
  * Money is stored in øre (1 NOK = 100 øre) as integers — never floats.
@@ -51,9 +57,22 @@ export const user = pgTable('user', {
 	 */
 	phone: text('phone').notNull().unique(),
 	passwordHash: text('password_hash').notNull(),
-	avatarPath: text('avatar_path'),
 	locale: text('locale').notNull().default('nb'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+/**
+ * Avatars live in their own table so ordinary user queries never drag the image
+ * bytes along. At friend-group scale (a handful of 256px WebPs) this is far less
+ * machinery than a PVC or an object store, and it rides along with DB backups.
+ */
+export const userAvatar = pgTable('user_avatar', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	mimeType: text('mime_type').notNull(),
+	bytes: bytea('bytes').notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
 
 export const session = pgTable('session', {
@@ -230,6 +249,7 @@ export const ledgerEntry = pgTable(
 // --- Inferred types -------------------------------------------------------
 
 export type User = typeof user.$inferSelect;
+export type UserAvatar = typeof userAvatar.$inferSelect;
 export type Session = typeof session.$inferSelect;
 export type Invite = typeof invite.$inferSelect;
 export type Game = typeof game.$inferSelect;
