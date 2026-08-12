@@ -7,5 +7,5 @@ export const POST: RequestHandler = async (event) => {
 		await auth.invalidateSession(event.locals.session.id);
 	}
 	auth.deleteSessionTokenCookie(event);
-	redirect(302, '/auth');
+	redirect(303, '/auth');
 };

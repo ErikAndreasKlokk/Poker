@@ -38,8 +38,9 @@ export const actions: Actions = {
 			return problem(error, 'login');
 		}
 
+		// 303 so the browser follows up with a GET rather than re-posting.
 		await startSession(event, userId);
-		redirect(302, '/');
+		redirect(303, '/');
 	},
 
 	register: async (event) => {
@@ -65,6 +66,6 @@ export const actions: Actions = {
 		}
 
 		await startSession(event, userId);
-		redirect(302, '/');
+		redirect(303, '/');
 	}
 };
