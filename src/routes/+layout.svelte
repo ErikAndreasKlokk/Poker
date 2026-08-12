@@ -1,19 +1,21 @@
 <script lang="ts">
-	import type { Pathname } from '$app/types';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
-	import { locales, localizeHref } from '$lib/paraglide/runtime';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 
 	let { children } = $props();
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-{@render children()}
 
-<div style="display:none">
-	{#each locales as locale (locale)}
-		<a href={resolve(localizeHref(page.url.pathname, { locale }) as Pathname)}>{locale}</a>
-	{/each}
+<!--
+	The layout owns the viewport height so the footer always lands just below the
+	content instead of a screen further down. Pages use flex-1, not min-h-dvh.
+-->
+<div class="flex min-h-dvh flex-col">
+	{@render children()}
+
+	<footer class="mx-auto flex w-full max-w-md justify-end px-5 pt-2 pb-6">
+		<LanguageSwitcher />
+	</footer>
 </div>

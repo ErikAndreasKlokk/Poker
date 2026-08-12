@@ -97,7 +97,7 @@
 
 <svelte:head><title>{data.name} · {m.app_name()}</title></svelte:head>
 
-<main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-3 px-4 pt-3 pb-4">
+<main class="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 px-4 pt-3 pb-4">
 	<header class="flex items-start justify-between gap-3">
 		<div class="min-w-0">
 			<h1 class="truncate text-lg font-semibold tracking-tight">{data.name}</h1>

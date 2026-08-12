@@ -48,7 +48,7 @@
 			{#if isButton}
 				<span
 					class="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-white text-[0.6rem] font-bold text-neutral-900 shadow"
-					title="dealer"
+					title={m.a11y_dealer_button()}
 				>
 					D
 				</span>

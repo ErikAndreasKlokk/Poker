@@ -92,10 +92,17 @@ export async function registerUser(input: RegisterInput): Promise<string> {
 
 // --- Login ----------------------------------------------------------------
 
-export async function verifyCredentials(rawUsername: string, password: string): Promise<string> {
+export async function verifyCredentials(
+	rawUsername: string,
+	password: string
+): Promise<{ id: string; locale: string }> {
 	const username = rawUsername.trim();
 	const [existing] = await db
-		.select({ id: table.user.id, passwordHash: table.user.passwordHash })
+		.select({
+			id: table.user.id,
+			passwordHash: table.user.passwordHash,
+			locale: table.user.locale
+		})
 		.from(table.user)
 		.where(eq(table.user.username, username));
 
@@ -108,7 +115,7 @@ export async function verifyCredentials(rawUsername: string, password: string): 
 	const ok = await verify(existing.passwordHash, password, ARGON2_OPTIONS);
 	if (!ok) throw new AccountProblem('invalid_credentials');
 
-	return existing.id;
+	return { id: existing.id, locale: existing.locale };
 }
 
 // --- Avatars --------------------------------------------------------------

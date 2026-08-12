@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import type { Card } from '$lib/protocol';
 
 	let {
@@ -41,6 +42,6 @@
 		class="inline-flex shrink-0 bg-sky-800 bg-[repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(255,255,255,0.12)_3px,rgba(255,255,255,0.12)_6px)] shadow-sm ring-1 ring-black/20 {sizeClasses[
 			size
 		]}"
-		aria-label="face down card"
+		aria-label={m.a11y_face_down_card()}
 	></span>
 {/if}

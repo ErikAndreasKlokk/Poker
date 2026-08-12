@@ -36,7 +36,7 @@
 
 <svelte:head><title>{m.app_name()}</title></svelte:head>
 
-<main class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 p-5">
+<main class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 p-5">
 	<h1 class="text-center text-3xl font-semibold tracking-tight">{m.app_name()}</h1>
 
 	<div class="grid grid-cols-2 rounded-xl bg-neutral-200/70 p-1 dark:bg-neutral-800">

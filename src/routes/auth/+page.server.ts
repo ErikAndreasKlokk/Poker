@@ -6,6 +6,7 @@ import {
 	registerUser,
 	verifyCredentials
 } from '$lib/server/accounts';
+import { cookieName as localeCookieName } from '$lib/paraglide/runtime';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -31,15 +32,28 @@ export const actions: Actions = {
 		const username = String(data.get('username') ?? '');
 		const password = String(data.get('password') ?? '');
 
-		let userId: string;
+		let account: { id: string; locale: string };
 		try {
-			userId = await verifyCredentials(username, password);
+			account = await verifyCredentials(username, password);
 		} catch (error) {
 			return problem(error, 'login');
 		}
 
+		// Apply the saved language on a device that has no preference yet, so
+		// signing in elsewhere lands in the right one. If this browser already has
+		// a locale set, that was a deliberate choice — possibly made on the login
+		// page a moment ago — and it wins.
+		if (!event.cookies.get(localeCookieName)) {
+			event.cookies.set(localeCookieName, account.locale, {
+				path: '/',
+				httpOnly: false,
+				sameSite: 'lax',
+				maxAge: 60 * 60 * 24 * 365
+			});
+		}
+
 		// 303 so the browser follows up with a GET rather than re-posting.
-		await startSession(event, userId);
+		await startSession(event, account.id);
 		redirect(303, '/');
 	},
 

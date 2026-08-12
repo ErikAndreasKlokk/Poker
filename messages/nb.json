@@ -147,5 +147,14 @@
 	"street_preflop": "Preflop",
 	"street_flop": "Flop",
 	"street_turn": "Turn",
-	"street_river": "River"
+	"street_river": "River",
+
+	"error_not_your_game": "Du var ikke med i dette spillet.",
+	"error_no_such_hand": "Fant ikke den hånden.",
+	"error_unsupported_locale": "Ukjent språk.",
+	"error_not_found": "Fant ikke siden.",
+	"error_unexpected": "Noe gikk galt.",
+	"error_go_home": "Tilbake til start",
+	"a11y_dealer_button": "Dealerknapp",
+	"a11y_face_down_card": "Kort med baksiden opp"
 }

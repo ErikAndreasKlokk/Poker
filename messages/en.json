@@ -147,5 +147,14 @@
 	"street_preflop": "Preflop",
 	"street_flop": "Flop",
 	"street_turn": "Turn",
-	"street_river": "River"
+	"street_river": "River",
+
+	"error_not_your_game": "You weren't part of this game.",
+	"error_no_such_hand": "That hand doesn't exist.",
+	"error_unsupported_locale": "Unknown language.",
+	"error_not_found": "Page not found.",
+	"error_unexpected": "Something went wrong.",
+	"error_go_home": "Back to the start",
+	"a11y_dealer_button": "Dealer button",
+	"a11y_face_down_card": "Face-down card"
 }
