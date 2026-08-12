@@ -11,6 +11,8 @@ export type ClientMessage =
 	| { type: 'sit'; seat: number }
 	| { type: 'leave' }
 	| { type: 'start' }
+	| { type: 'rebuy' }
+	| { type: 'end_session' }
 	| { type: 'act'; action: Action }
 	| { type: 'chat'; body: string }
 	| { type: 'ping' };

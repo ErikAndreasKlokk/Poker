@@ -30,6 +30,24 @@
 	const mySeat = $derived(table?.you.seat ?? null);
 	const isHost = $derived(!!table && table.you.userId === table.hostUserId);
 	const legal = $derived(table?.legal ?? null);
+	const me = $derived(table?.seats.find((s) => s.userId === table.you.userId) ?? null);
+	/** Busted players can top up, but only between hands. */
+	const canRebuy = $derived(
+		!!table && table.status !== 'ended' && me !== null && me.stack === 0 && table.toAct === null
+	);
+
+	const errorMessages: Record<string, () => string> = {
+		not_host: m.error_not_host,
+		hand_in_progress: m.error_hand_in_progress,
+		wait_for_next_hand: m.error_wait_for_next_hand,
+		not_playing: m.error_not_playing,
+		seat_taken: m.error_seat_taken,
+		already_seated: m.error_already_seated,
+		need_two_players: m.error_need_two_players,
+		not_your_turn: m.error_not_your_turn,
+		game_ended: m.error_game_ended
+	};
+	const errorText = $derived(socketError ? (errorMessages[socketError]?.() ?? socketError) : null);
 
 	// Ticks only while a clock is running, so an idle table stays quiet.
 	let now = $state(Date.now());
@@ -101,12 +119,12 @@
 		</p>
 	{/if}
 
-	{#if socketError}
+	{#if errorText}
 		<p
 			class="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
 			role="alert"
 		>
-			{socketError}
+			{errorText}
 		</p>
 	{/if}
 
@@ -209,6 +227,37 @@
 			{:else}
 				<p class="py-2 text-center text-sm text-neutral-500">{m.table_waiting_for_host()}</p>
 			{/if}
+		{:else if table.status === 'ended'}
+			<p class="py-2 text-center text-sm text-neutral-500">{m.table_ended()}</p>
+		{/if}
+
+		{#if canRebuy}
+			<button
+				type="button"
+				onclick={() => send({ type: 'rebuy' })}
+				class="rounded-xl border border-emerald-600 py-3 font-semibold text-emerald-700 dark:text-emerald-400"
+			>
+				{m.table_rebuy()}
+			</button>
+		{/if}
+
+		{#if table.realMoney || table.status === 'ended'}
+			<a
+				href={resolve('/games/[code]/settlement', { code: data.code })}
+				class="text-center text-sm underline underline-offset-4"
+			>
+				{m.table_settlement_link()}
+			</a>
+		{/if}
+
+		{#if isHost && table.status === 'running'}
+			<button
+				type="button"
+				onclick={() => send({ type: 'end_session' })}
+				class="text-sm text-neutral-500 underline underline-offset-4"
+			>
+				{m.table_end_session()}
+			</button>
 		{/if}
 
 		<!-- Chat sits above the action bar so the bar stays pinned under the thumb. -->

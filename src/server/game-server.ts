@@ -143,6 +143,10 @@ export function attachGameServer(server: Server, db: Db) {
 					return await room.leave(client.userId);
 				case 'start':
 					return await room.start(client.userId);
+				case 'rebuy':
+					return await room.rebuy(client.userId);
+				case 'end_session':
+					return await room.endSession(client.userId);
 				case 'act':
 					return await room.act(client.userId, message.action);
 				case 'chat': {

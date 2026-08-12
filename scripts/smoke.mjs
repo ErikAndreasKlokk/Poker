@@ -271,5 +271,65 @@ check('next hand deals automatically', erikWs.table.handNumber === 2);
 erikWs.socket.close();
 olaWs.socket.close();
 
+// --- Real-money session and settlement ------------------------------------
+
+res = await erik.post('/games?/create', {
+	name: 'Money night',
+	realMoney: 'true',
+	vippsBoksCode: 'BOKS123',
+	buyInKr: '250',
+	smallBlind: '10',
+	bigBlind: '20',
+	startingStack: '1000',
+	maxSeats: '6',
+	turnSeconds: '60'
+});
+const moneyCode = (res.headers.get('location') ?? '').split('/').pop() ?? '';
+check('create a real-money game', res.status === 303 && moneyCode.length === 6, moneyCode);
+
+const erikMoney = new Client(moneyCode, erik.cookie, 'erik$');
+const olaMoney = new Client(moneyCode, ola.cookie, 'ola$');
+await Promise.all([erikMoney.ready, olaMoney.ready]);
+
+erikMoney.send({ type: 'sit', seat: 0 });
+await erikMoney.state((t) => t.seats.length === 1, 'erik seated');
+olaMoney.send({ type: 'sit', seat: 1 });
+await Promise.all([
+	erikMoney.state((t) => t.seats.length === 2, 'erik sees two'),
+	olaMoney.state((t) => t.seats.length === 2, 'ola sees two')
+]);
+
+erikMoney.send({ type: 'start' });
+await Promise.all([
+	erikMoney.state((t) => t.handNumber !== null, 'erik dealt'),
+	olaMoney.state((t) => t.handNumber !== null, 'ola dealt')
+]);
+
+// Heads-up the button posts the small blind and acts first; folding there loses
+// exactly the 10-chip small blind.
+const moneyActor = erikMoney.table.toAct === 0 ? erikMoney : olaMoney;
+moneyActor.send({ type: 'act', action: { type: 'fold' } });
+await erikMoney.state((t) => t.seats.some((s) => s.won > 0), 'money payout');
+
+erikMoney.send({ type: 'end_session' });
+await erikMoney.state((t) => t.status === 'ended', 'session ended');
+check('host can end the session', erikMoney.table.status === 'ended');
+
+res = await erik.get(`/games/${moneyCode}/settlement`);
+const settlement = await res.text();
+check('settlement page renders', res.status === 200, `status ${res.status}`);
+
+// 1000 chips cost 250 kr, so a chip is 25 øre and the 10-chip swing is 2,50 kr.
+check('settlement shows the exact amount owed', settlement.includes('2,50 kr'), '2,50 kr');
+
+const loser = erikMoney.table.seats.find((s) => s.stack === 990);
+check('losing stack is one small blind down', loser !== undefined);
+
+res = await new Session().get(`/games/${moneyCode}/settlement`);
+check('settlement is not public', res.status === 302, `status ${res.status}`);
+
+erikMoney.socket.close();
+olaMoney.socket.close();
+
 log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

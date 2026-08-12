@@ -87,5 +87,32 @@
 	"table_all_in_label": "All in",
 	"table_won": "vant {amount}",
 	"table_chat_placeholder": "Si noe …",
-	"table_chat_send": "Send"
+	"table_chat_send": "Send",
+	"table_rebuy": "Kjøp inn på nytt",
+	"table_end_session": "Avslutt kvelden",
+	"table_settlement_link": "Se oppgjøret",
+	"table_ended": "Spillet er avsluttet.",
+
+	"settle_title": "Oppgjør",
+	"settle_back": "Til bordet",
+	"settle_payments": "Hvem betaler hvem",
+	"settle_pays": "betaler",
+	"settle_all_square": "Alle er kvitt. Ingen skylder noe.",
+	"settle_summary": "Regnskap",
+	"settle_paid_in": "inn {amount}",
+	"settle_paid_out": "ut {amount}",
+	"settle_copied": "Kopiert!",
+	"settle_vipps_hint": "Trykk på nummeret for å kopiere det, og send beløpet i Vipps.",
+	"settle_play_money": "Dette spillet ble spilt uten penger, så det er ingenting å gjøre opp.",
+	"settle_not_ended": "Spillet pågår fortsatt. Oppgjøret blir endelig når verten avslutter kvelden.",
+
+	"error_not_host": "Bare verten kan gjøre det.",
+	"error_hand_in_progress": "Vent til hånden er ferdig.",
+	"error_wait_for_next_hand": "Du må vente til neste hånd.",
+	"error_not_playing": "Du sitter ikke ved dette bordet.",
+	"error_seat_taken": "Plassen er opptatt.",
+	"error_already_seated": "Du sitter allerede ved bordet.",
+	"error_need_two_players": "Dere må være minst to for å starte.",
+	"error_not_your_turn": "Det er ikke din tur.",
+	"error_game_ended": "Spillet er avsluttet."
 }

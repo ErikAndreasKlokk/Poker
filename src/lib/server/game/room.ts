@@ -5,6 +5,7 @@ import type { Action } from '../../poker/engine';
 import { applyAction, legalActions, startHand, type HandState } from '../../poker/engine';
 import { evaluate } from '../../poker/evaluate';
 import type { ChatView, SeatView, TableView } from '../../protocol';
+import { cashOutAmounts } from '../settlement';
 
 /** Delay between a hand finishing and the next one being dealt. */
 const NEXT_HAND_DELAY_MS = 6000;
@@ -183,6 +184,102 @@ export class GameRoom {
 		this.onChange();
 		// Someone joining a running table may be the second player it needed.
 		this.maybeResume();
+	}
+
+	/**
+	 * Tops a player's stack back up to a full buy-in's worth of chips.
+	 *
+	 * Only allowed while the player is not in the current hand: settlement writes
+	 * the engine's final stacks back over the room's, so chips added mid-hand
+	 * would simply be overwritten.
+	 */
+	async rebuy(userId: string) {
+		const player = this.players.get(userId);
+		if (!player) throw new RoomError('not_playing');
+		if (this.game.status === 'ended') throw new RoomError('game_ended');
+		if (this.hand?.seats.some((s) => s.seat === player.seat)) {
+			throw new RoomError('wait_for_next_hand');
+		}
+
+		player.stack += this.game.startingStack;
+		player.sittingOut = false;
+
+		await this.db.transaction(async (tx) => {
+			await tx
+				.update(schema.gamePlayer)
+				.set({ stack: player.stack, status: 'active' })
+				.where(
+					and(eq(schema.gamePlayer.gameId, this.game.id), eq(schema.gamePlayer.userId, userId))
+				);
+
+			if (this.game.realMoney) {
+				await tx.insert(schema.ledgerEntry).values({
+					gameId: this.game.id,
+					userId,
+					type: 'rebuy',
+					chips: this.game.startingStack,
+					amountOre: this.game.buyInOre ?? 0,
+					recordedByUserId: userId
+				});
+			}
+		});
+
+		this.onChange();
+		this.maybeResume();
+	}
+
+	/**
+	 * Closes the session and records what everyone is cashing out.
+	 *
+	 * Converting chips to money happens exactly once, here, so the settlement is
+	 * computed from a fixed set of ledger rows rather than from live stacks that
+	 * could still move.
+	 */
+	async endSession(userId: string) {
+		if (userId !== this.game.hostUserId) throw new RoomError('not_host');
+		if (this.game.status === 'ended') throw new RoomError('game_ended');
+		if (this.hand && this.hand.street !== 'complete') throw new RoomError('hand_in_progress');
+
+		this.clearTimers();
+		this.hand = null;
+
+		if (this.game.realMoney) {
+			const rows = await this.db
+				.select({ type: schema.ledgerEntry.type, amountOre: schema.ledgerEntry.amountOre })
+				.from(schema.ledgerEntry)
+				.where(eq(schema.ledgerEntry.gameId, this.game.id));
+
+			const paidInOre = rows
+				.filter((row) => row.type !== 'cash_out')
+				.reduce((sum, row) => sum + row.amountOre, 0);
+
+			const stacks = new Map([...this.players.values()].map((p) => [p.userId, p.stack]));
+			const amounts = cashOutAmounts(
+				stacks,
+				this.game.buyInOre ?? 0,
+				this.game.startingStack,
+				paidInOre
+			);
+
+			await this.db.insert(schema.ledgerEntry).values(
+				[...amounts].map(([cashOutUserId, amountOre]) => ({
+					gameId: this.game.id,
+					userId: cashOutUserId,
+					type: 'cash_out' as const,
+					chips: this.players.get(cashOutUserId)?.stack ?? 0,
+					amountOre,
+					recordedByUserId: userId
+				}))
+			);
+		}
+
+		await this.db
+			.update(schema.game)
+			.set({ status: 'ended', endedAt: new Date() })
+			.where(eq(schema.game.id, this.game.id));
+		this.game = { ...this.game, status: 'ended' };
+
+		this.onChange();
 	}
 
 	async leave(userId: string) {

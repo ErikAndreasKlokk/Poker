@@ -87,5 +87,32 @@
 	"table_all_in_label": "All in",
 	"table_won": "won {amount}",
 	"table_chat_placeholder": "Say something …",
-	"table_chat_send": "Send"
+	"table_chat_send": "Send",
+	"table_rebuy": "Buy back in",
+	"table_end_session": "End the session",
+	"table_settlement_link": "See the settlement",
+	"table_ended": "This game has ended.",
+
+	"settle_title": "Settle up",
+	"settle_back": "Back to the table",
+	"settle_payments": "Who pays whom",
+	"settle_pays": "pays",
+	"settle_all_square": "Everyone is square. Nobody owes anything.",
+	"settle_summary": "Accounts",
+	"settle_paid_in": "in {amount}",
+	"settle_paid_out": "out {amount}",
+	"settle_copied": "Copied!",
+	"settle_vipps_hint": "Tap a number to copy it, then send the amount in Vipps.",
+	"settle_play_money": "This game was played without money, so there is nothing to settle.",
+	"settle_not_ended": "The game is still going. The settlement is final once the host ends the session.",
+
+	"error_not_host": "Only the host can do that.",
+	"error_hand_in_progress": "Wait until the hand is finished.",
+	"error_wait_for_next_hand": "You'll have to wait until the next hand.",
+	"error_not_playing": "You're not seated at this table.",
+	"error_seat_taken": "That seat is taken.",
+	"error_already_seated": "You're already seated.",
+	"error_need_two_players": "You need at least two players to start.",
+	"error_not_your_turn": "It's not your turn.",
+	"error_game_ended": "This game has ended."
 }
