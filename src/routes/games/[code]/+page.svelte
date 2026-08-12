@@ -5,7 +5,7 @@
 	import ActionBar from '$lib/components/ActionBar.svelte';
 	import PlayingCard from '$lib/components/PlayingCard.svelte';
 	import SeatSpot from '$lib/components/SeatSpot.svelte';
-	import type { Action, ClientMessage, SeatView } from '$lib/protocol';
+	import { REACTIONS, type Action, type ClientMessage, type SeatView } from '$lib/protocol';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -241,14 +241,22 @@
 			</button>
 		{/if}
 
-		{#if table.realMoney || table.status === 'ended'}
+		<div class="flex justify-center gap-4 text-sm">
 			<a
-				href={resolve('/games/[code]/settlement', { code: data.code })}
-				class="text-center text-sm underline underline-offset-4"
+				href={resolve('/games/[code]/hands', { code: data.code })}
+				class="underline underline-offset-4"
 			>
-				{m.table_settlement_link()}
+				{m.hands_link()}
 			</a>
-		{/if}
+			{#if table.realMoney || table.status === 'ended'}
+				<a
+					href={resolve('/games/[code]/settlement', { code: data.code })}
+					class="underline underline-offset-4"
+				>
+					{m.table_settlement_link()}
+				</a>
+			{/if}
+		</div>
 
 		{#if isHost && table.status === 'running'}
 			<button
@@ -266,10 +274,27 @@
 				{#each chat as message (message.id)}
 					<li class="break-words">
 						<span class="font-medium">{message.username}</span>
-						<span class="text-neutral-600 dark:text-neutral-300">{message.body}</span>
+						{#if message.kind === 'reaction'}
+							<span class="text-lg leading-none">{message.body}</span>
+						{:else}
+							<span class="text-neutral-600 dark:text-neutral-300">{message.body}</span>
+						{/if}
 					</li>
 				{/each}
 			</ul>
+
+			<div class="flex flex-wrap gap-1">
+				{#each REACTIONS as emoji (emoji)}
+					<button
+						type="button"
+						onclick={() => send({ type: 'reaction', emoji })}
+						class="rounded-lg bg-neutral-100 px-2.5 py-1.5 text-lg leading-none active:scale-95 dark:bg-neutral-800"
+						aria-label={emoji}
+					>
+						{emoji}
+					</button>
+				{/each}
+			</div>
 			<form onsubmit={sendChat} class="flex gap-2">
 				<input
 					bind:value={chatDraft}

@@ -70,6 +70,10 @@ export class TableConnection {
 				case 'chat':
 					this.chat = [...this.chat, message.message].slice(-200);
 					break;
+				case 'chat_history':
+					// Replaces rather than merges: the backlog is authoritative on connect.
+					this.chat = message.messages;
+					break;
 				case 'error':
 					this.error = message.message;
 					break;

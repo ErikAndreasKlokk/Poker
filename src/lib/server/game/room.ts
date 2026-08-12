@@ -4,7 +4,7 @@ import * as schema from '../db/schema';
 import type { Action } from '../../poker/engine';
 import { applyAction, legalActions, startHand, type HandState } from '../../poker/engine';
 import { evaluate } from '../../poker/evaluate';
-import type { ChatView, SeatView, TableView } from '../../protocol';
+import { REACTIONS, type ChatView, type SeatView, type TableView } from '../../protocol';
 import { cashOutAmounts } from '../settlement';
 
 /** Delay between a hand finishing and the next one being dealt. */
@@ -490,24 +490,56 @@ export class GameRoom {
 
 	// --- Chat -------------------------------------------------------------
 
-	async chat(userId: string, body: string): Promise<ChatView> {
+	async chat(userId: string, body: string, kind: 'chat' | 'reaction' = 'chat'): Promise<ChatView> {
 		const player = this.players.get(userId);
 		const trimmed = body.trim().slice(0, 500);
 		if (!trimmed) throw new RoomError('empty_message');
+		// Reactions come from a fixed set, so a client cannot smuggle arbitrary
+		// content through the reaction path and have it rendered differently.
+		if (kind === 'reaction' && !REACTIONS.includes(trimmed as (typeof REACTIONS)[number])) {
+			throw new RoomError('unknown_reaction');
+		}
 
 		const [row] = await this.db
 			.insert(schema.chatMessage)
-			.values({ gameId: this.game.id, userId, kind: 'chat', body: trimmed })
+			.values({ gameId: this.game.id, userId, kind, body: trimmed })
 			.returning();
 
 		return {
 			id: row.id,
 			userId,
 			username: player?.username ?? '',
-			kind: 'chat',
+			kind,
 			body: trimmed,
 			at: row.createdAt.getTime()
 		};
+	}
+
+	/** Recent chat, oldest first, so a joining client can render the backlog. */
+	async recentChat(limit = 50): Promise<ChatView[]> {
+		const rows = await this.db
+			.select({
+				id: schema.chatMessage.id,
+				userId: schema.chatMessage.userId,
+				kind: schema.chatMessage.kind,
+				body: schema.chatMessage.body,
+				createdAt: schema.chatMessage.createdAt,
+				username: schema.user.username
+			})
+			.from(schema.chatMessage)
+			.leftJoin(schema.user, eq(schema.user.id, schema.chatMessage.userId))
+			.where(eq(schema.chatMessage.gameId, this.game.id))
+			.orderBy(desc(schema.chatMessage.createdAt))
+			.limit(limit);
+
+		return rows.reverse().map((row) => ({
+			id: row.id,
+			userId: row.userId,
+			username: row.username ?? '',
+			kind: row.kind,
+			body: row.body,
+			at: row.createdAt.getTime()
+		}));
 	}
 
 	// --- Views ------------------------------------------------------------

@@ -15,7 +15,11 @@ export type ClientMessage =
 	| { type: 'end_session' }
 	| { type: 'act'; action: Action }
 	| { type: 'chat'; body: string }
+	| { type: 'reaction'; emoji: string }
 	| { type: 'ping' };
+
+/** The only reactions a client may send; anything else is rejected server-side. */
+export const REACTIONS = ['👍', '😂', '😱', '🤔', '🔥', '🫡', '🤬', '🍀'] as const;
 
 // --- Server -> client -----------------------------------------------------
 
@@ -92,5 +96,7 @@ export interface TableView {
 export type ServerMessage =
 	| { type: 'state'; table: TableView }
 	| { type: 'chat'; message: ChatView }
+	/** Backlog sent once on connect, so a reconnect doesn't lose the conversation. */
+	| { type: 'chat_history'; messages: ChatView[] }
 	| { type: 'error'; message: string }
 	| { type: 'pong' };

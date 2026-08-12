@@ -105,6 +105,10 @@ export function attachGameServer(server: Server, db: Db) {
 		room.connect(user.id);
 
 		send(client, { type: 'state', table: room.viewFor(user.id, user.username) });
+		room
+			.recentChat()
+			.then((messages) => send(client, { type: 'chat_history', messages }))
+			.catch((error) => console.error('[ws] chat backlog failed', error));
 
 		socket.on('message', (raw) => {
 			void handleMessage(client, code, room, raw.toString());
@@ -151,6 +155,10 @@ export function attachGameServer(server: Server, db: Db) {
 					return await room.act(client.userId, message.action);
 				case 'chat': {
 					const posted = await room.chat(client.userId, message.body);
+					return broadcast(code, { type: 'chat', message: posted });
+				}
+				case 'reaction': {
+					const posted = await room.chat(client.userId, message.emoji, 'reaction');
 					return broadcast(code, { type: 'chat', message: posted });
 				}
 				default:

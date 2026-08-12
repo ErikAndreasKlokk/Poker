@@ -331,5 +331,37 @@ check('settlement is not public', res.status === 302, `status ${res.status}`);
 erikMoney.socket.close();
 olaMoney.socket.close();
 
+// --- Hand history and replay ---------------------------------------------
+
+res = await erik.get(`/games/${code}/hands`);
+const historyPage = await res.text();
+check('hand history renders', res.status === 200, `status ${res.status}`);
+check('history lists a played hand', historyPage.includes('1'), 'hand numbers present');
+
+res = await erik.get(`/games/${code}/hands/1`);
+const replayPage = await res.text();
+check('replay renders the first hand', res.status === 200, `status ${res.status}`);
+
+res = await erik.get(`/games/${code}/hands/999`);
+check('unknown hand 404s', res.status === 404, `status ${res.status}`);
+
+res = await new Session().get(`/games/${code}/hands`);
+check('hand history is not public', res.status === 302, `status ${res.status}`);
+
+// Hand 1 ended in a fold with no showdown, and that game is still running, so
+// the opponent's cards must not be readable from the replay. Cards are rendered
+// with the card code as an aria-label.
+const shows = (card) => replayPage.includes(`aria-label="${card}"`);
+check(
+	'replay shows the viewer their own cards',
+	erikSelf.hole.every(shows),
+	erikSelf.hole.join(' ')
+);
+check(
+	'replay hides an opponent hand that never went to showdown',
+	olaSelf.hole.every((card) => !shows(card)),
+	olaSelf.hole.join(' ')
+);
+
 log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);
