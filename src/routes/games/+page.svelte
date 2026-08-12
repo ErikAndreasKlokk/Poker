@@ -30,11 +30,22 @@
 <svelte:head><title>{m.lobby_title()} · {m.app_name()}</title></svelte:head>
 
 <main class="mx-auto flex w-full max-w-5xl flex-col gap-8 p-5 pb-16 lg:p-6">
-	<header class="flex items-center justify-between pt-2">
+	<header class="flex items-center justify-between gap-4 pt-2">
 		<h1 class="font-arcade text-xl text-gold lg:text-2xl">{m.lobby_title()}</h1>
-		<a href={resolve('/')} class="text-sm text-muted underline underline-offset-4">
-			{m.app_name()}
-		</a>
+
+		{#if data.user}
+			<div class="flex items-center gap-3">
+				<img
+					src="/avatar/{data.user.id}"
+					alt=""
+					class="size-9 border-2 border-edge-hi object-cover"
+				/>
+				<span class="text-sm font-bold">{data.user.username}</span>
+				<form method="POST" action="/logout">
+					<button class="px-btn px-3 py-2 text-sm font-bold">{m.log_out()}</button>
+				</form>
+			</div>
+		{/if}
 	</header>
 
 	{#if error}

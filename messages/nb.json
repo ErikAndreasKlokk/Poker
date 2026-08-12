@@ -26,6 +26,8 @@
 	"error_invalid_credentials": "Feil brukernavn eller passord.",
 	"error_invalid_avatar": "Bildet må være JPEG, PNG eller WebP, og under 512 kB.",
 
+	"home_tagline": "Poker med vennene, uansett hvor dere sitter.",
+	"home_login_cta": "Logg inn for å spille",
 	"lobby_title": "Spill",
 	"lobby_new_game": "Nytt spill",
 	"lobby_join_title": "Bli med i et spill",

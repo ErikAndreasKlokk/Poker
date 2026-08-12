@@ -26,6 +26,8 @@
 	"error_invalid_credentials": "Wrong username or password.",
 	"error_invalid_avatar": "The image must be JPEG, PNG or WebP, and under 512 kB.",
 
+	"home_tagline": "Poker with your friends, wherever you are.",
+	"home_login_cta": "Log in to play",
 	"lobby_title": "Games",
 	"lobby_new_game": "New game",
 	"lobby_join_title": "Join a game",
