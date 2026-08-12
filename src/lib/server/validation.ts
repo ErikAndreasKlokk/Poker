@@ -32,6 +32,7 @@ export type GameError =
 	| 'invalid_turn_seconds'
 	| 'missing_boks_code'
 	| 'invalid_buy_in'
+	| 'buy_in_too_small'
 	| 'invalid_voice_url';
 
 export class GameProblem extends Error {
@@ -53,12 +54,19 @@ export interface GameSettings {
 	voiceChatUrl: string | null;
 }
 
-/** Parses kroner like "250" or "249,50" into integer øre without float drift. */
-export function parseKronerToOre(raw: string): number {
-	const cleaned = raw.trim().replace(',', '.');
-	if (!/^\d{1,7}(\.\d{1,2})?$/.test(cleaned)) throw new GameProblem('invalid_buy_in');
-	const [kroner, decimals = ''] = cleaned.split('.');
-	return Number(kroner) * 100 + Number(decimals.padEnd(2, '0'));
+/**
+ * Parses a whole number of kroner.
+ *
+ * Whole kroner only, because one chip is one krone: a buy-in of 249,50 would
+ * need half a chip.
+ */
+export function parseWholeKroner(raw: string): number {
+	const cleaned = raw.trim();
+	if (!/^\d{1,7}$/.test(cleaned)) throw new GameProblem('invalid_buy_in');
+
+	const kroner = Number(cleaned);
+	if (kroner < 1) throw new GameProblem('invalid_buy_in');
+	return kroner;
 }
 
 /**
@@ -82,12 +90,6 @@ export function parseGameSettings(raw: Record<string, string>): GameSettings {
 		throw new GameProblem('invalid_blinds');
 	}
 
-	const startingStack = Number(raw.startingStack);
-	// Ten big blinds is about the shallowest stack that still plays like poker.
-	if (!Number.isInteger(startingStack) || startingStack < bigBlind * 10) {
-		throw new GameProblem('invalid_stack');
-	}
-
 	const maxSeats = Number(raw.maxSeats);
 	if (!Number.isInteger(maxSeats) || maxSeats < 2 || maxSeats > 9) {
 		throw new GameProblem('invalid_seats');
@@ -101,12 +103,27 @@ export function parseGameSettings(raw: Record<string, string>): GameSettings {
 	const realMoney = raw.realMoney === 'on' || raw.realMoney === 'true';
 	let vippsBoksCode: string | null = null;
 	let buyInOre: number | null = null;
+	let startingStack: number;
+
+	// Ten big blinds is about the shallowest stack that still plays like poker.
+	const shallowest = bigBlind * 10;
 
 	if (realMoney) {
 		vippsBoksCode = (raw.vippsBoksCode ?? '').trim();
 		if (!vippsBoksCode) throw new GameProblem('missing_boks_code');
-		buyInOre = parseKronerToOre(raw.buyInKr ?? '');
-		if (buyInOre <= 0) throw new GameProblem('invalid_buy_in');
+
+		// One chip is one krone, so the buy-in is the stack. Keeping them as two
+		// independent numbers meant a chip was worth some awkward fraction and
+		// every payout had to be converted; this way the table reads in kroner.
+		const kroner = parseWholeKroner(raw.buyInKr ?? '');
+		buyInOre = kroner * 100;
+		startingStack = kroner;
+		if (startingStack < shallowest) throw new GameProblem('buy_in_too_small');
+	} else {
+		startingStack = Number(raw.startingStack);
+		if (!Number.isInteger(startingStack) || startingStack < shallowest) {
+			throw new GameProblem('invalid_stack');
+		}
 	}
 
 	const voiceRaw = (raw.voiceChatUrl ?? '').trim();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameProblem, parseGameSettings, parseKronerToOre } from './validation';
+import { GameProblem, parseGameSettings, parseWholeKroner } from './validation';
 
 const valid = {
 	name: 'Fredagspoker',
@@ -21,19 +21,18 @@ function codeOf(raw: Record<string, string>): string {
 	throw new Error('expected a rejection but parsing succeeded');
 }
 
-describe('parseKronerToOre', () => {
+describe('parseWholeKroner', () => {
 	it.each([
-		['250', 25000],
-		['249,50', 24950],
-		['249.5', 24950],
-		['0,01', 1],
-		['1', 100]
-	])('converts %s kr to %i øre', (input, expected) => {
-		expect(parseKronerToOre(input)).toBe(expected);
+		['250', 250],
+		['1', 1],
+		['  200  ', 200]
+	])('reads %s as %i kroner', (input, expected) => {
+		expect(parseWholeKroner(input)).toBe(expected);
 	});
 
-	it.each(['', 'abc', '1,234', '-5', '1.2.3'])('rejects %s', (input) => {
-		expect(() => parseKronerToOre(input)).toThrow(GameProblem);
+	it.each(['', 'abc', '-5', '0', '249,50', '249.5'])('rejects %s', (input) => {
+		// Fractions are refused: one chip is one krone, so half a krone is half a chip.
+		expect(() => parseWholeKroner(input)).toThrow(GameProblem);
 	});
 });
 
@@ -64,14 +63,45 @@ describe('parseGameSettings', () => {
 		expect(codeOf({ ...valid, realMoney: 'true', buyInKr: '250' })).toBe('missing_boks_code');
 	});
 
-	it('accepts a real-money game with a Boks code and buy-in', () => {
+	it('makes the buy-in the stack, one chip to the krone', () => {
 		const settings = parseGameSettings({
 			...valid,
 			realMoney: 'true',
 			vippsBoksCode: 'ABC123',
 			buyInKr: '250'
 		});
-		expect(settings).toMatchObject({ realMoney: true, vippsBoksCode: 'ABC123', buyInOre: 25000 });
+		expect(settings).toMatchObject({
+			realMoney: true,
+			vippsBoksCode: 'ABC123',
+			buyInOre: 25_000,
+			startingStack: 250
+		});
+		// A chip is worth exactly 100 øre, so nothing can round away.
+		expect(settings.buyInOre! / settings.startingStack).toBe(100);
+	});
+
+	it('ignores any starting stack sent alongside a real-money buy-in', () => {
+		const settings = parseGameSettings({
+			...valid,
+			startingStack: '9999',
+			realMoney: 'true',
+			vippsBoksCode: 'ABC123',
+			buyInKr: '300'
+		});
+		expect(settings.startingStack).toBe(300);
+	});
+
+	it('rejects a real-money buy-in shallower than ten big blinds', () => {
+		// 20 big blind means at least 200 kr.
+		expect(codeOf({ ...valid, realMoney: 'true', vippsBoksCode: 'ABC', buyInKr: '199' })).toBe(
+			'buy_in_too_small'
+		);
+	});
+
+	it('rejects fractional kroner', () => {
+		expect(codeOf({ ...valid, realMoney: 'true', vippsBoksCode: 'ABC', buyInKr: '249,50' })).toBe(
+			'invalid_buy_in'
+		);
 	});
 
 	it.each([

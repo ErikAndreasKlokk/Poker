@@ -46,7 +46,7 @@
 	"game_boks_code": "Vipps Boks code",
 	"game_boks_hint": "Create a Boks in the Vipps app and paste the code or link here. We can't see the balance — the Boks is only used to pay in and out.",
 	"game_buy_in": "Buy-in (kr)",
-	"game_buy_in_hint": "What one stack costs in real money.",
+	"game_buy_in_hint": "One chip is one krone, so this is also the starting stack. The blinds are in kroner too.",
 	"game_small_blind": "Small blind",
 	"game_big_blind": "Big blind",
 	"game_starting_stack": "Starting stack",
@@ -61,7 +61,8 @@
 	"error_invalid_seats": "There must be between 2 and 9 seats.",
 	"error_invalid_turn_seconds": "Time to act must be between 10 and 120 seconds.",
 	"error_missing_boks_code": "You need a Vipps Boks code when playing for money.",
-	"error_invalid_buy_in": "Invalid buy-in amount.",
+	"error_invalid_buy_in": "The buy-in must be a whole number of kroner.",
+	"error_buy_in_too_small": "The buy-in must be at least ten big blinds.",
 	"error_invalid_voice_url": "The link must be a valid https address.",
 	"error_game_not_found": "No game found with that code.",
 

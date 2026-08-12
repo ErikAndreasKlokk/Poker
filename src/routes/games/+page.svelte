@@ -18,6 +18,7 @@
 		invalid_turn_seconds: m.error_invalid_turn_seconds,
 		missing_boks_code: m.error_missing_boks_code,
 		invalid_buy_in: m.error_invalid_buy_in,
+		buy_in_too_small: m.error_buy_in_too_small,
 		invalid_voice_url: m.error_invalid_voice_url,
 		game_not_found: m.error_game_not_found
 	};
@@ -150,9 +151,17 @@
 					<span class="text-xs text-muted">{m.game_boks_hint()}</span>
 				</label>
 
+				<!-- No separate stack field: one chip is one krone, so this is both. -->
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium">{m.game_buy_in()}</span>
-					<input name="buyInKr" inputmode="decimal" class={field} />
+					<input
+						name="buyInKr"
+						type="number"
+						inputmode="numeric"
+						value="200"
+						min="1"
+						class={field}
+					/>
 					<span class="text-xs text-muted">{m.game_buy_in_hint()}</span>
 				</label>
 			{/if}
@@ -166,10 +175,12 @@
 					<span class="text-sm font-medium">{m.game_big_blind()}</span>
 					<input name="bigBlind" type="number" value="20" min="2" required class={field} />
 				</label>
-				<label class="flex flex-col gap-1.5">
-					<span class="text-sm font-medium">{m.game_starting_stack()}</span>
-					<input name="startingStack" type="number" value="2000" required class={field} />
-				</label>
+				{#if moneyMode !== 'true'}
+					<label class="flex flex-col gap-1.5">
+						<span class="text-sm font-medium">{m.game_starting_stack()}</span>
+						<input name="startingStack" type="number" value="2000" required class={field} />
+					</label>
+				{/if}
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium">{m.game_max_seats()}</span>
 					<input name="maxSeats" type="number" value="6" min="2" max="9" required class={field} />

@@ -46,7 +46,7 @@
 	"game_boks_code": "Vipps-bokskode",
 	"game_boks_hint": "Lag en boks i Vipps-appen og lim inn koden eller lenken her. Vi kan ikke se saldoen — boksen brukes bare til å betale inn og ut.",
 	"game_buy_in": "Innkjøp (kr)",
-	"game_buy_in_hint": "Hva én stack koster i ekte penger.",
+	"game_buy_in_hint": "Én sjetong er én krone, så dette er også startstacken. Blindene er også i kroner.",
 	"game_small_blind": "Small blind",
 	"game_big_blind": "Big blind",
 	"game_starting_stack": "Startstack",
@@ -61,7 +61,8 @@
 	"error_invalid_seats": "Det må være mellom 2 og 9 plasser.",
 	"error_invalid_turn_seconds": "Tenketiden må være mellom 10 og 120 sekunder.",
 	"error_missing_boks_code": "Du må oppgi en Vipps-bokskode når dere spiller om penger.",
-	"error_invalid_buy_in": "Ugyldig innkjøpsbeløp.",
+	"error_invalid_buy_in": "Innkjøpet må være et helt antall kroner.",
+	"error_buy_in_too_small": "Innkjøpet må være minst ti ganger big blind.",
 	"error_invalid_voice_url": "Lenken må være en gyldig https-adresse.",
 	"error_game_not_found": "Fant ikke noe spill med den koden.",
 

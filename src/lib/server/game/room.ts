@@ -305,16 +305,18 @@ export class GameRoom {
 			const stacks = new Map([...this.players.values()].map((p) => [p.userId, p.stack]));
 			const amounts = distributePool(stacks, poolOre);
 
-			await this.db.insert(schema.ledgerEntry).values(
-				[...amounts].map(([cashOutUserId, amountOre]) => ({
-					gameId: this.game.id,
-					userId: cashOutUserId,
-					type: 'cash_out' as const,
-					chips: this.players.get(cashOutUserId)?.stack ?? 0,
-					amountOre,
-					recordedByUserId: userId
-				}))
-			);
+			// Everyone may already have cashed out by leaving, in which case there is
+			// nothing left to record and an empty insert would be rejected outright.
+			const cashOuts = [...amounts].map(([cashOutUserId, amountOre]) => ({
+				gameId: this.game.id,
+				userId: cashOutUserId,
+				type: 'cash_out' as const,
+				chips: this.players.get(cashOutUserId)?.stack ?? 0,
+				amountOre,
+				recordedByUserId: userId
+			}));
+
+			if (cashOuts.length > 0) await this.db.insert(schema.ledgerEntry).values(cashOuts);
 		}
 
 		await this.db
