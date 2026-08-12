@@ -37,16 +37,16 @@
 <svelte:head><title>{m.app_name()}</title></svelte:head>
 
 <main class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 p-5">
-	<h1 class="text-center text-3xl font-semibold tracking-tight">{m.app_name()}</h1>
+	<h1 class="text-center font-arcade text-2xl text-gold">{m.app_name()}</h1>
 
-	<div class="grid grid-cols-2 rounded-xl bg-neutral-200/70 p-1 dark:bg-neutral-800">
+	<div class="px-inset grid grid-cols-2 gap-1 p-1">
 		{#each [{ id: 'login', label: m.auth_login_tab() }, { id: 'register', label: m.auth_register_tab() }] as tab (tab.id)}
 			<button
 				type="button"
-				class="rounded-lg px-4 py-2.5 text-sm font-medium transition"
-				class:bg-white={mode === tab.id}
-				class:shadow-sm={mode === tab.id}
-				class:dark:bg-neutral-700={mode === tab.id}
+				class="px-4 py-2.5 text-sm font-bold transition"
+				class:bg-surface-hi={mode === tab.id}
+				class:text-gold={mode === tab.id}
+				class:text-muted={mode !== tab.id}
 				onclick={() => (mode = tab.id as typeof mode)}
 			>
 				{tab.label}
@@ -55,10 +55,7 @@
 	</div>
 
 	{#if error}
-		<p
-			class="rounded-lg bg-red-100 px-4 py-3 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
-			role="alert"
-		>
+		<p class="px-panel border-danger px-4 py-3 text-sm text-danger" role="alert">
 			{error}
 		</p>
 	{/if}
@@ -82,7 +79,7 @@
 					name="username"
 					autocomplete="username"
 					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field px-3 py-3 text-base"
 				/>
 			</label>
 
@@ -93,15 +90,11 @@
 					type="password"
 					autocomplete="current-password"
 					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field px-3 py-3 text-base"
 				/>
 			</label>
 
-			<button
-				type="submit"
-				disabled={submitting}
-				class="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white disabled:opacity-60"
-			>
+			<button type="submit" disabled={submitting} class="px-btn px-btn-primary px-4 py-4 font-bold">
 				{m.auth_login_submit()}
 			</button>
 		</form>
@@ -134,9 +127,9 @@
 					name="username"
 					autocomplete="username"
 					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field px-3 py-3 text-base"
 				/>
-				<span class="text-xs text-neutral-500">{m.auth_username_hint()}</span>
+				<span class="text-xs text-muted">{m.auth_username_hint()}</span>
 			</label>
 
 			<label class="flex flex-col gap-1.5">
@@ -147,9 +140,9 @@
 					inputmode="tel"
 					autocomplete="tel"
 					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field px-3 py-3 text-base"
 				/>
-				<span class="text-xs text-neutral-500">{m.auth_phone_hint()}</span>
+				<span class="text-xs text-muted">{m.auth_phone_hint()}</span>
 			</label>
 
 			<label class="flex flex-col gap-1.5">
@@ -159,31 +152,31 @@
 					type="password"
 					autocomplete="new-password"
 					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field px-3 py-3 text-base"
 				/>
-				<span class="text-xs text-neutral-500">{m.auth_password_hint()}</span>
+				<span class="text-xs text-muted">{m.auth_password_hint()}</span>
 			</label>
 
 			<label class="flex flex-col gap-1.5">
 				<span class="text-sm font-medium">{m.auth_invite()}</span>
-				<input
-					name="invite"
-					required
-					class="rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900"
-				/>
-				<span class="text-xs text-neutral-500">{m.auth_invite_hint()}</span>
+				<input name="invite" required class="px-field px-3 py-3 text-base" />
+				<span class="text-xs text-muted">{m.auth_invite_hint()}</span>
 			</label>
 
 			<div class="flex flex-col gap-1.5">
 				<span class="text-sm font-medium">
 					{m.auth_avatar()}
-					<span class="font-normal text-neutral-500">({m.auth_optional()})</span>
+					<span class="font-normal text-muted">({m.auth_optional()})</span>
 				</span>
 				<div class="flex items-center gap-3">
 					{#if avatarPreview}
-						<img src={avatarPreview} alt="" class="size-14 shrink-0 rounded-full object-cover" />
+						<img
+							src={avatarPreview}
+							alt=""
+							class="size-14 shrink-0 border-2 border-edge-hi object-cover"
+						/>
 					{:else}
-						<div class="size-14 shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-800"></div>
+						<div class="px-inset size-14 shrink-0"></div>
 					{/if}
 					<input
 						name="avatar"
@@ -193,14 +186,10 @@
 						class="min-w-0 flex-1 text-sm"
 					/>
 				</div>
-				<span class="text-xs text-neutral-500">{m.auth_avatar_hint()}</span>
+				<span class="text-xs text-muted">{m.auth_avatar_hint()}</span>
 			</div>
 
-			<button
-				type="submit"
-				disabled={submitting}
-				class="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white disabled:opacity-60"
-			>
+			<button type="submit" disabled={submitting} class="px-btn px-btn-primary px-4 py-4 font-bold">
 				{m.auth_register_submit()}
 			</button>
 		</form>

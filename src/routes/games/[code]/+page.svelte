@@ -3,8 +3,10 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import { TableConnection } from '$lib/client/table.svelte';
 	import ActionBar from '$lib/components/ActionBar.svelte';
+	import ChipStack from '$lib/components/ChipStack.svelte';
 	import PlayingCard from '$lib/components/PlayingCard.svelte';
 	import SeatSpot from '$lib/components/SeatSpot.svelte';
+	import { denominationsFor } from '$lib/chips';
 	import { REACTIONS, type Action, type ClientMessage, type SeatView } from '$lib/protocol';
 	import type { PageData } from './$types';
 
@@ -26,6 +28,23 @@
 	const chat = $derived(connection?.chat ?? []);
 	const connected = $derived(connection?.connected ?? false);
 	const socketError = $derived(connection?.error ?? null);
+
+	// Chip colours are sized to this game, so a full stack is about eight chips
+	// of the top denomination however deep the table plays.
+	const denominations = $derived(
+		table ? denominationsFor(table.startingStack, table.smallBlind) : [1]
+	);
+
+	/**
+	 * Everything at stake right now, including the current street's bets.
+	 *
+	 * The pot proper only counts completed streets, which means preflop it reads
+	 * as zero while the blinds sit in front of the players — technically right,
+	 * but useless if what you want to know is what you are playing for.
+	 */
+	const potAtStake = $derived(
+		table ? table.potTotal + table.seats.reduce((sum, seat) => sum + seat.committed, 0) : 0
+	);
 
 	const mySeat = $derived(table?.you.seat ?? null);
 	const isHost = $derived(!!table && table.you.userId === table.hostUserId);
@@ -101,44 +120,33 @@
 	<header class="flex items-start justify-between gap-3">
 		<div class="min-w-0">
 			<h1 class="truncate text-lg font-semibold tracking-tight">{data.name}</h1>
-			<p class="text-xs text-neutral-500">{m.table_share({ code: data.code })}</p>
+			<p class="text-xs text-muted">{m.table_share({ code: data.code })}</p>
 		</div>
-		<a
-			href={resolve('/games')}
-			class="shrink-0 text-sm text-neutral-500 underline underline-offset-4"
-		>
+		<a href={resolve('/games')} class="shrink-0 text-sm text-muted underline underline-offset-4">
 			{m.lobby_title()}
 		</a>
 	</header>
 
 	{#if !connected}
-		<p
-			class="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-		>
+		<p class="px-panel border-gold px-3 py-2 text-sm text-gold">
 			{table ? m.table_disconnected() : m.table_connecting()}
 		</p>
 	{/if}
 
 	{#if errorText}
-		<p
-			class="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
-			role="alert"
-		>
+		<p class="px-panel border-danger px-3 py-2 text-sm text-danger" role="alert">
 			{errorText}
 		</p>
 	{/if}
 
 	{#if table}
 		<!-- The felt: seats arranged around the rim, board and pot in the middle. -->
-		<section
-			class="relative aspect-5/6 w-full rounded-[2.5rem] bg-emerald-800 ring-1 ring-emerald-950/40 ring-inset"
-			style="background-image: radial-gradient(ellipse at 50% 40%, rgb(6 120 90 / 0.9), transparent 70%)"
-		>
+		<section class="px-felt relative aspect-5/6 w-full">
 			<div
-				class="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2"
+				class="absolute top-1/2 left-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 px-2"
 			>
 				{#if table.handNumber}
-					<span class="text-[0.6rem] tracking-widest text-emerald-200/70 uppercase">
+					<span class="font-arcade text-[0.5rem] tracking-widest text-emerald-200/70">
 						{m.table_hand_number({ number: table.handNumber })}
 					</span>
 				{/if}
@@ -149,19 +157,29 @@
 					{/each}
 				</div>
 
-				{#if table.potTotal > 0}
-					<span
-						class="rounded-full bg-black/40 px-3 py-1 text-sm font-semibold text-emerald-100 tabular-nums"
-					>
-						{m.table_pot()}
-						{table.potTotal}
-					</span>
+				{#if potAtStake > 0}
+					<!-- The pot as a real pile, so its size is visible at a glance. -->
+					<div class="flex flex-col items-center gap-1">
+						<ChipStack
+							amount={potAtStake}
+							{denominations}
+							size="sm"
+							maxPerColumn={5}
+							showTotal={false}
+						/>
+						<span
+							class="border-2 border-felt-dark bg-ink/70 px-2 py-1 font-arcade text-[0.5rem] text-gold tabular-nums"
+						>
+							{m.table_pot()}
+							{potAtStake}
+						</span>
+					</div>
 				{/if}
 
 				{#if table.pots.length > 1}
 					<div class="flex flex-wrap justify-center gap-1">
 						{#each table.pots.slice(1) as pot, i (i)}
-							<span class="rounded-full bg-black/30 px-2 py-0.5 text-[0.6rem] text-emerald-100">
+							<span class="border-2 border-felt-dark bg-ink/60 px-1.5 py-0.5 text-[0.6rem]">
 								{m.table_side_pot()}
 								{pot.amount}
 							</span>
@@ -180,6 +198,7 @@
 					<SeatSpot
 						{seat}
 						{index}
+						{denominations}
 						isButton={table.button === index}
 						isActing={table.toAct === index}
 						isYou={seat?.userId === table.you.userId}
@@ -194,7 +213,7 @@
 		</section>
 
 		{#if table.realMoney && table.vippsBoksCode}
-			<p class="rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+			<p class="px-panel px-3 py-2 text-sm">
 				<span class="font-medium">{m.table_boks()}:</span>
 				<span class="font-mono">{table.vippsBoksCode}</span>
 			</p>
@@ -220,22 +239,22 @@
 					type="button"
 					disabled={table.seats.length < 2}
 					onclick={() => send({ type: 'start' })}
-					class="rounded-xl bg-emerald-600 py-4 font-semibold text-white disabled:opacity-50"
+					class="px-btn px-btn-primary py-4 font-bold"
 				>
 					{table.seats.length < 2 ? m.table_need_two() : m.table_start()}
 				</button>
 			{:else}
-				<p class="py-2 text-center text-sm text-neutral-500">{m.table_waiting_for_host()}</p>
+				<p class="py-2 text-center text-sm text-muted">{m.table_waiting_for_host()}</p>
 			{/if}
 		{:else if table.status === 'ended'}
-			<p class="py-2 text-center text-sm text-neutral-500">{m.table_ended()}</p>
+			<p class="py-2 text-center text-sm text-muted">{m.table_ended()}</p>
 		{/if}
 
 		{#if canRebuy}
 			<button
 				type="button"
 				onclick={() => send({ type: 'rebuy' })}
-				class="rounded-xl border border-emerald-600 py-3 font-semibold text-emerald-700 dark:text-emerald-400"
+				class="px-btn py-3 font-bold text-success"
 			>
 				{m.table_rebuy()}
 			</button>
@@ -262,7 +281,7 @@
 			<button
 				type="button"
 				onclick={() => send({ type: 'end_session' })}
-				class="text-sm text-neutral-500 underline underline-offset-4"
+				class="text-sm text-muted underline underline-offset-4"
 			>
 				{m.table_end_session()}
 			</button>
@@ -277,7 +296,7 @@
 						{#if message.kind === 'reaction'}
 							<span class="text-lg leading-none">{message.body}</span>
 						{:else}
-							<span class="text-neutral-600 dark:text-neutral-300">{message.body}</span>
+							<span class="text-parchment">{message.body}</span>
 						{/if}
 					</li>
 				{/each}
@@ -288,7 +307,7 @@
 					<button
 						type="button"
 						onclick={() => send({ type: 'reaction', emoji })}
-						class="rounded-lg bg-neutral-100 px-2.5 py-1.5 text-lg leading-none active:scale-95 dark:bg-neutral-800"
+						class="px-btn px-2 py-1.5 text-lg leading-none"
 						aria-label={emoji}
 					>
 						{emoji}
@@ -300,11 +319,9 @@
 					bind:value={chatDraft}
 					maxlength="500"
 					placeholder={m.table_chat_placeholder()}
-					class="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2.5 text-base dark:border-neutral-700 dark:bg-neutral-900"
+					class="px-field min-w-0 flex-1 px-3 py-2.5 text-base"
 				/>
-				<button
-					class="rounded-lg bg-neutral-800 px-4 py-2.5 text-sm font-medium text-white dark:bg-neutral-200 dark:text-neutral-900"
-				>
+				<button class="px-btn px-4 py-2.5 text-sm font-bold">
 					{m.table_chat_send()}
 				</button>
 			</form>
@@ -322,7 +339,7 @@
 			<button
 				type="button"
 				onclick={() => send({ type: 'leave' })}
-				class="text-sm text-neutral-500 underline underline-offset-4"
+				class="text-sm text-muted underline underline-offset-4"
 			>
 				{m.table_leave()}
 			</button>

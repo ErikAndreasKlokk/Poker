@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { parseGameSettings, type GameSettings } from '$lib/server/validation';
@@ -61,9 +61,14 @@ export async function findGameByCode(code: string) {
 	return game ?? null;
 }
 
-/** Games the user hosts or is seated at, plus anything still open in the lobby. */
+/**
+ * Every game still open, with how many are seated.
+ *
+ * Counted with a grouped join rather than correlated subqueries: the raw-SQL
+ * version silently returned zero for tables that clearly had players.
+ */
 export async function listGames(userId: string) {
-	const rows = await db
+	return db
 		.select({
 			id: schema.game.id,
 			code: schema.game.code,
@@ -75,24 +80,18 @@ export async function listGames(userId: string) {
 			maxSeats: schema.game.maxSeats,
 			hostUserId: schema.game.hostUserId,
 			createdAt: schema.game.createdAt,
-			seated: sql<number>`(
-				select count(*)::int from ${schema.gamePlayer}
-				where ${schema.gamePlayer.gameId} = ${schema.game.id}
-				  and ${schema.gamePlayer.leftAt} is null
-			)`,
-			youAreSeated: sql<boolean>`exists (
-				select 1 from ${schema.gamePlayer}
-				where ${schema.gamePlayer.gameId} = ${schema.game.id}
-				  and ${schema.gamePlayer.userId} = ${userId}
-				  and ${schema.gamePlayer.leftAt} is null
-			)`
+			seated: sql<number>`count(${schema.gamePlayer.id})::int`,
+			youAreSeated: sql<boolean>`coalesce(bool_or(${schema.gamePlayer.userId} = ${userId}), false)`
 		})
 		.from(schema.game)
-		.where(sql`${schema.game.status} <> 'ended'`)
+		.leftJoin(
+			schema.gamePlayer,
+			and(eq(schema.gamePlayer.gameId, schema.game.id), isNull(schema.gamePlayer.leftAt))
+		)
+		.where(ne(schema.game.status, 'ended'))
+		.groupBy(schema.game.id)
 		.orderBy(desc(schema.game.createdAt))
 		.limit(50);
-
-	return rows;
 }
 
 export async function endGame(gameId: string, hostUserId: string) {

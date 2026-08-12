@@ -85,28 +85,28 @@
 			<h1 class="truncate text-2xl font-semibold tracking-tight">
 				{m.replay_title({ number: data.handNumber })}
 			</h1>
-			<p class="text-sm text-neutral-500">{data.name}</p>
+			<p class="text-sm text-muted">{data.name}</p>
 		</div>
 		<a
 			href={resolve('/games/[code]/hands', { code: data.code })}
-			class="shrink-0 text-sm text-neutral-500 underline underline-offset-4"
+			class="shrink-0 text-sm text-muted underline underline-offset-4"
 		>
 			{m.replay_back()}
 		</a>
 	</header>
 
 	{#if !frame}
-		<p class="text-neutral-500">{m.replay_empty()}</p>
+		<p class="text-muted">{m.replay_empty()}</p>
 	{:else}
-		<section
-			class="flex flex-col items-center gap-3 rounded-2xl bg-emerald-800 px-4 py-6 text-emerald-50"
-		>
+		<section class="px-felt flex flex-col items-center gap-3 px-4 py-6">
 			<div class="flex min-h-14 items-center gap-1">
 				{#each frame.board as card (card)}
 					<PlayingCard {card} size="md" />
 				{/each}
 			</div>
-			<span class="rounded-full bg-black/40 px-3 py-1 text-sm font-semibold tabular-nums">
+			<span
+				class="border-2 border-felt-dark bg-ink/70 px-2 py-1 font-arcade text-[0.6rem] text-gold tabular-nums"
+			>
 				{m.table_pot()}
 				{frameTotal(frame)}
 			</span>
@@ -118,10 +118,9 @@
 			{#each seats as seat (seat)}
 				{@const isFolded = frame.folded.includes(seat)}
 				<li
-					class="flex items-center gap-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
+					class="px-panel flex items-center gap-3 p-3"
 					class:opacity-50={isFolded}
-					class:ring-2={frame.seat === seat}
-					class:ring-emerald-500={frame.seat === seat}
+					class:border-gold={frame.seat === seat}
 				>
 					<span class="min-w-0 flex-1 truncate text-sm font-medium">{who(seat)}</span>
 
@@ -144,13 +143,11 @@
 		</ul>
 
 		{#if !data.sessionEnded}
-			<p class="text-xs text-neutral-500">{m.replay_hidden_cards()}</p>
+			<p class="text-xs text-muted">{m.replay_hidden_cards()}</p>
 		{/if}
 
-		<section
-			class="sticky bottom-2 flex flex-col gap-2 rounded-xl bg-white/95 p-3 shadow-lg backdrop-blur dark:bg-neutral-900/95"
-		>
-			<span class="text-center text-xs text-neutral-500">
+		<section class="px-panel sticky bottom-2 flex flex-col gap-2 p-3">
+			<span class="text-center text-xs text-muted">
 				{m.replay_step({ current: step + 1, total: frames.length })}
 			</span>
 			<input
@@ -159,21 +156,21 @@
 				max={frames.length - 1}
 				bind:value={step}
 				aria-label={m.replay_step({ current: step + 1, total: frames.length })}
-				class="h-8 w-full accent-emerald-600"
+				class="h-8 w-full accent-gold"
 			/>
 			<div class="grid grid-cols-3 gap-2">
 				<button
 					type="button"
 					disabled={step === 0}
 					onclick={() => (step = Math.max(0, step - 1))}
-					class="rounded-lg bg-neutral-200 py-3 text-sm font-medium disabled:opacity-40 dark:bg-neutral-800"
+					class="px-btn py-3 text-sm font-bold"
 				>
 					{m.replay_previous()}
 				</button>
 				<button
 					type="button"
 					onclick={() => (playing = !playing)}
-					class="rounded-lg bg-emerald-600 py-3 text-sm font-medium text-white"
+					class="px-btn px-btn-primary py-3 text-sm font-bold"
 				>
 					{playing ? m.replay_pause() : m.replay_play()}
 				</button>
@@ -181,7 +178,7 @@
 					type="button"
 					disabled={step >= frames.length - 1}
 					onclick={() => (step = Math.min(frames.length - 1, step + 1))}
-					class="rounded-lg bg-neutral-200 py-3 text-sm font-medium disabled:opacity-40 dark:bg-neutral-800"
+					class="px-btn py-3 text-sm font-bold"
 				>
 					{m.replay_next()}
 				</button>

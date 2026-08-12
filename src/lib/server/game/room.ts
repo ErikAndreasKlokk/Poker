@@ -625,6 +625,7 @@ export class GameRoom {
 			voiceChatUrl: this.game.voiceChatUrl,
 			smallBlind: this.game.smallBlind,
 			bigBlind: this.game.bigBlind,
+			startingStack: this.game.startingStack,
 			maxSeats: this.game.maxSeats,
 			turnSeconds: this.game.turnSeconds,
 			seats,

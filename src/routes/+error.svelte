@@ -21,7 +21,7 @@
 <svelte:head><title>{page.status} · {m.app_name()}</title></svelte:head>
 
 <main class="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 p-5">
-	<p class="font-mono text-5xl font-semibold text-neutral-300 dark:text-neutral-700">
+	<p class="font-arcade text-4xl text-edge-hi">
 		{page.status}
 	</p>
 	<p class="text-center">{text}</p>

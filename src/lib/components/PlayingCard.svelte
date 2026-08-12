@@ -17,31 +17,33 @@
 	const suit = $derived(card ? (card.slice(-1) as keyof typeof SUIT_SYMBOLS) : null);
 	const isRed = $derived(suit === 'h' || suit === 'd');
 
+	// Square corners and hard shadows: no border radius anywhere in the deck.
 	const sizeClasses = {
-		sm: 'h-9 w-6.5 text-[0.6rem] rounded',
-		md: 'h-14 w-10 text-sm rounded-md',
-		lg: 'h-20 w-14 text-lg rounded-lg'
+		sm: 'h-9 w-6.5 text-[0.5rem]',
+		md: 'h-14 w-10 text-[0.7rem]',
+		lg: 'h-20 w-14 text-base'
 	} as const;
 </script>
 
 {#if card}
 	<span
-		class="inline-flex shrink-0 flex-col items-center justify-center bg-white leading-none font-semibold shadow-sm ring-1 ring-black/10 {sizeClasses[
+		class="inline-flex shrink-0 flex-col items-center justify-center border-2 border-neutral-900 bg-parchment leading-none font-bold shadow-[2px_2px_0_0_#00000080] {sizeClasses[
 			size
 		]}"
-		class:text-rose-600={isRed}
-		class:text-neutral-900={!isRed}
+		class:text-danger={isRed}
+		class:text-ink={!isRed}
 		aria-label={card}
 	>
-		<span>{rank}</span>
-		<span aria-hidden="true">{SUIT_SYMBOLS[suit!]}</span>
+		<span class="font-arcade">{rank}</span>
+		<span class="text-[1.4em] leading-none" aria-hidden="true">{SUIT_SYMBOLS[suit!]}</span>
 	</span>
 {:else}
-	<!-- Face down: a plain patterned back, no information leaked. -->
+	<!-- Face down: a woven pixel back, carrying no information. -->
 	<span
-		class="inline-flex shrink-0 bg-sky-800 bg-[repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(255,255,255,0.12)_3px,rgba(255,255,255,0.12)_6px)] shadow-sm ring-1 ring-black/20 {sizeClasses[
+		class="inline-flex shrink-0 border-2 border-neutral-900 bg-[#3b2f7a] shadow-[2px_2px_0_0_#00000080] {sizeClasses[
 			size
 		]}"
+		style="background-image: repeating-linear-gradient(45deg, #ffffff1f 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, #00000033 0 2px, transparent 2px 4px)"
 		aria-label={m.a11y_face_down_card()}
 	></span>
 {/if}

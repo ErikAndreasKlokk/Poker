@@ -45,15 +45,15 @@
 </script>
 
 <section
-	class="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-emerald-500/60 bg-white/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur dark:bg-neutral-950/95"
+	class="px-panel sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-x-0 border-b-0 border-t-gold px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
 >
 	<div class="flex items-center justify-between text-sm">
-		<span class="font-semibold text-emerald-700 dark:text-emerald-400">{m.table_your_turn()}</span>
+		<span class="font-arcade text-[0.6rem] text-gold">{m.table_your_turn()}</span>
 		{#if secondsLeft !== null}
 			<span
-				class="font-mono tabular-nums"
-				class:text-rose-600={secondsLeft <= 5}
-				class:text-neutral-500={secondsLeft > 5}
+				class="font-arcade text-[0.6rem] tabular-nums"
+				class:text-danger={secondsLeft <= 5}
+				class:text-muted={secondsLeft > 5}
 			>
 				{secondsLeft}s
 			</span>
@@ -67,15 +67,15 @@
 					<button
 						type="button"
 						onclick={() => (raiseTo = preset.to)}
-						class="rounded-md bg-neutral-200 px-2.5 py-1.5 text-xs font-medium dark:bg-neutral-800"
-						class:ring-2={raiseTo === preset.to}
-						class:ring-emerald-500={raiseTo === preset.to}
+						class="px-btn px-2 py-1.5 text-xs font-semibold"
+						class:border-gold={raiseTo === preset.to}
+						class:text-gold={raiseTo === preset.to}
 					>
 						{preset.label}
 					</button>
 				{/each}
 			</div>
-			<span class="ml-auto font-mono text-sm font-semibold tabular-nums">{raiseTo}</span>
+			<span class="ml-auto font-arcade text-xs text-gold tabular-nums">{raiseTo}</span>
 		</div>
 
 		<input
@@ -85,7 +85,7 @@
 			step="1"
 			bind:value={raiseTo}
 			aria-label={m.table_raise({ amount: raiseTo })}
-			class="h-8 w-full accent-emerald-600"
+			class="h-8 w-full accent-gold"
 		/>
 	{/if}
 
@@ -94,7 +94,7 @@
 		<button
 			type="button"
 			onclick={() => onact({ type: 'fold' })}
-			class="rounded-xl bg-neutral-200 py-4 text-sm font-semibold active:scale-[0.98] dark:bg-neutral-800"
+			class="px-btn px-btn-danger py-4 text-sm font-bold"
 		>
 			{m.table_fold()}
 		</button>
@@ -103,7 +103,7 @@
 			<button
 				type="button"
 				onclick={() => onact({ type: 'check' })}
-				class="rounded-xl bg-neutral-200 py-4 text-sm font-semibold active:scale-[0.98] dark:bg-neutral-800"
+				class="px-btn py-4 text-sm font-bold"
 			>
 				{m.table_check()}
 			</button>
@@ -111,7 +111,7 @@
 			<button
 				type="button"
 				onclick={() => onact({ type: 'call' })}
-				class="rounded-xl bg-neutral-200 py-4 text-sm font-semibold active:scale-[0.98] dark:bg-neutral-800"
+				class="px-btn py-4 text-sm font-bold"
 			>
 				{m.table_call({ amount: legal.callAmount })}
 			</button>
@@ -121,7 +121,7 @@
 			type="button"
 			disabled={!legal.canRaise}
 			onclick={() => onact({ type: 'raise', to: raiseTo })}
-			class="rounded-xl bg-emerald-600 py-4 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-40"
+			class="px-btn px-btn-primary py-4 text-sm font-bold"
 		>
 			{isShove ? m.table_all_in() : m.table_raise({ amount: raiseTo })}
 		</button>

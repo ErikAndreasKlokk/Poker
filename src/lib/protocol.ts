@@ -68,6 +68,8 @@ export interface TableView {
 	voiceChatUrl: string | null;
 	smallBlind: number;
 	bigBlind: number;
+	/** A full buy-in in chips; used to size the chip denominations on the table. */
+	startingStack: number;
 	maxSeats: number;
 	/** Length of the action clock, so the client can render it as a fraction. */
 	turnSeconds: number;

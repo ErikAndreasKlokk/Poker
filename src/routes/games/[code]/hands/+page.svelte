@@ -14,18 +14,18 @@
 	<header class="flex items-start justify-between gap-3 pt-2">
 		<div class="min-w-0">
 			<h1 class="truncate text-2xl font-semibold tracking-tight">{m.hands_title()}</h1>
-			<p class="text-sm text-neutral-500">{data.name}</p>
+			<p class="text-sm text-muted">{data.name}</p>
 		</div>
 		<a
 			href={resolve('/games/[code]', { code: data.code })}
-			class="shrink-0 text-sm text-neutral-500 underline underline-offset-4"
+			class="shrink-0 text-sm text-muted underline underline-offset-4"
 		>
 			{m.settle_back()}
 		</a>
 	</header>
 
 	{#if data.hands.length === 0}
-		<p class="text-neutral-500">{m.hands_empty()}</p>
+		<p class="text-muted">{m.hands_empty()}</p>
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each data.hands as hand (hand.handNumber)}
@@ -35,11 +35,11 @@
 							code: data.code,
 							number: String(hand.handNumber)
 						})}
-						class="flex flex-col gap-2 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
+						class="px-panel flex flex-col gap-2 p-4"
 					>
 						<div class="flex items-baseline justify-between gap-3">
 							<span class="font-medium">{m.hands_hand({ number: hand.handNumber })}</span>
-							<span class="text-sm text-neutral-500 tabular-nums">
+							<span class="text-sm text-muted tabular-nums">
 								{m.hands_pot({ amount: hand.potTotal })}
 							</span>
 						</div>
@@ -53,7 +53,7 @@
 						{/if}
 
 						{#each hand.winners as winner (winner.seat)}
-							<span class="text-sm text-emerald-600 dark:text-emerald-400">
+							<span class="text-sm text-success">
 								{m.hands_won({
 									username: winner.username ?? m.replay_seat({ seat: winner.seat }),
 									amount: winner.amount

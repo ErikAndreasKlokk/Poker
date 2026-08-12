@@ -33,10 +33,11 @@
 			type="button"
 			onclick={() => choose(locale)}
 			aria-current={locale === current ? 'true' : undefined}
-			class="rounded-md px-2 py-1 text-xs font-medium transition"
-			class:bg-neutral-200={locale === current}
-			class:dark:bg-neutral-800={locale === current}
-			class:text-neutral-500={locale !== current}
+			class="border-2 px-2 py-1 text-xs font-bold transition"
+			class:border-gold={locale === current}
+			class:text-gold={locale === current}
+			class:border-transparent={locale !== current}
+			class:text-muted={locale !== current}
 		>
 			{LABELS[locale] ?? locale}
 		</button>

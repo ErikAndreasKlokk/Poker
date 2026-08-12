@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
 	import type { SeatView } from '$lib/protocol';
+	import ChipStack from './ChipStack.svelte';
 	import PlayingCard from './PlayingCard.svelte';
 
 	let {
 		seat = null,
 		index,
+		denominations,
 		isButton = false,
 		isActing = false,
 		isYou = false,
@@ -16,6 +18,7 @@
 	}: {
 		seat?: SeatView | null;
 		index: number;
+		denominations: number[];
 		isButton?: boolean;
 		isActing?: boolean;
 		isYou?: boolean;
@@ -25,9 +28,8 @@
 	} = $props();
 </script>
 
-<div class="flex w-24 flex-col items-center gap-1">
+<div class="flex w-24 flex-col items-center gap-0.5">
 	{#if seat}
-		<!-- Cards sit above the plate so they read at a glance on a small screen. -->
 		<div class="flex h-9 items-end gap-0.5">
 			{#if seat.hole}
 				{#each seat.hole as card (card)}
@@ -41,13 +43,13 @@
 		</div>
 
 		<div
-			class="relative flex w-full flex-col items-center rounded-xl px-1.5 py-1.5 ring-1 transition
-				{isActing ? 'bg-emerald-950/95 ring-emerald-400' : 'bg-neutral-900/85 ring-white/10'}
-				{seat.folded ? 'opacity-45' : ''}"
+			class="relative flex w-full flex-col items-center border-2 px-1 py-1 transition
+				{isActing ? 'border-gold bg-surface-hi shadow-[0_0_0_2px_#ffc94a55]' : 'border-edge bg-surface'}
+				{seat.folded ? 'opacity-40' : ''}"
 		>
 			{#if isButton}
 				<span
-					class="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-white text-[0.6rem] font-bold text-neutral-900 shadow"
+					class="absolute -top-2 -right-2 grid size-5 place-items-center border-2 border-neutral-900 bg-parchment font-arcade text-[0.5rem] text-ink"
 					title={m.a11y_dealer_button()}
 				>
 					D
@@ -57,42 +59,49 @@
 			<img
 				src="/avatar/{seat.userId}"
 				alt=""
-				class="size-7 rounded-full object-cover ring-2 {isYou
-					? 'ring-emerald-400'
-					: 'ring-white/20'}"
+				class="size-7 border-2 object-cover {isYou ? 'border-gold' : 'border-edge-hi'}"
 			/>
-			<span class="mt-0.5 w-full truncate text-center text-[0.65rem] font-medium text-white">
+			<span class="mt-0.5 w-full truncate text-center text-[0.7rem] leading-tight font-semibold">
 				{seat.username}
 			</span>
-			<span class="text-[0.7rem] font-semibold text-emerald-300">{seat.stack}</span>
+
+			<!-- The stack itself, as chips: colour carries the denomination. Kept to a
+			     few chips so the column stays legible rather than a thin sliver. -->
+			<ChipStack amount={seat.stack} {denominations} size="sm" maxPerColumn={3} />
 
 			{#if clock !== null}
-				<span class="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-white/20">
+				<span class="mt-1 h-1 w-full bg-ink">
 					<span
-						class="block h-full rounded-full transition-[width] duration-200 ease-linear
-							{clock < 0.25 ? 'bg-rose-400' : 'bg-emerald-400'}"
+						class="block h-full transition-[width] duration-200 ease-linear
+							{clock < 0.25 ? 'bg-danger' : 'bg-gold'}"
 						style="width: {Math.round(clock * 100)}%"
 					></span>
 				</span>
 			{/if}
 		</div>
 
-		<div class="flex min-h-4 flex-col items-center gap-0.5 text-[0.6rem] leading-tight">
+		<!-- What they have pushed into the pot this street, in front of them. -->
+		<div class="flex min-h-5 flex-col items-center gap-0.5 text-[0.6rem] leading-tight">
 			{#if seat.committed > 0}
-				<span class="rounded-full bg-amber-400/90 px-1.5 font-semibold text-amber-950">
-					{seat.committed}
-				</span>
+				<ChipStack
+					amount={seat.committed}
+					{denominations}
+					size="xs"
+					maxPerColumn={3}
+					showTotal={false}
+				/>
+				<span class="font-semibold text-gold tabular-nums">{seat.committed}</span>
 			{/if}
 			{#if seat.allIn}
-				<span class="font-semibold text-amber-300">{m.table_all_in_label()}</span>
+				<span class="font-arcade text-[0.5rem] text-gold">{m.table_all_in_label()}</span>
 			{:else if seat.sittingOut}
-				<span class="text-neutral-400">{m.table_sitting_out()}</span>
+				<span class="text-muted">{m.table_sitting_out()}</span>
 			{/if}
 			{#if seat.won > 0}
-				<span class="font-semibold text-emerald-300">{m.table_won({ amount: seat.won })}</span>
+				<span class="font-semibold text-success">{m.table_won({ amount: seat.won })}</span>
 			{/if}
 			{#if seat.handDescription}
-				<span class="text-center text-white/80">{seat.handDescription}</span>
+				<span class="text-center text-parchment">{seat.handDescription}</span>
 			{/if}
 		</div>
 	{:else}
@@ -101,10 +110,10 @@
 			type="button"
 			disabled={!canSit}
 			onclick={() => onsit?.(index)}
-			class="w-full rounded-xl border border-dashed border-white/25 px-1.5 py-3 text-[0.65rem] text-white/50 transition enabled:hover:border-emerald-400 enabled:hover:text-emerald-300 disabled:opacity-40"
+			class="w-full border-2 border-dashed border-edge px-1 py-3 text-[0.65rem] text-muted transition enabled:hover:border-gold enabled:hover:text-gold disabled:opacity-40"
 		>
 			{canSit ? m.table_sit_here() : m.table_empty_seat()}
 		</button>
-		<div class="min-h-4"></div>
+		<div class="min-h-5"></div>
 	{/if}
 </div>

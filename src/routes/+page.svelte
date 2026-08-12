@@ -17,11 +17,11 @@
 				<img
 					src="/avatar/{data.user.id}"
 					alt=""
-					class="size-9 rounded-full bg-neutral-200 object-cover dark:bg-neutral-800"
+					class="size-9 border-2 border-edge-hi object-cover"
 				/>
 				<span class="text-sm font-medium">{data.user.username}</span>
 				<form method="POST" action="/logout">
-					<button class="text-sm text-neutral-500 underline underline-offset-4">
+					<button class="text-sm text-muted underline underline-offset-4">
 						{m.log_out()}
 					</button>
 				</form>
@@ -35,6 +35,6 @@
 
 	{#if data.user}
 		<!-- The lobby lands here next; game creation and joining are still to come. -->
-		<p class="text-neutral-500">…</p>
+		<p class="text-muted">…</p>
 	{/if}
 </main>

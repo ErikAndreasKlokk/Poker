@@ -24,8 +24,7 @@
 
 	const error = $derived(form?.code ? (errorMessages[form.code]?.() ?? null) : null);
 
-	const field =
-		'rounded-lg border border-neutral-300 px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900';
+	const field = 'px-field px-3 py-3 text-base';
 </script>
 
 <svelte:head><title>{m.lobby_title()} · {m.app_name()}</title></svelte:head>
@@ -33,22 +32,19 @@
 <main class="mx-auto flex w-full max-w-md flex-col gap-6 p-5 pb-16">
 	<header class="flex items-center justify-between pt-2">
 		<h1 class="text-2xl font-semibold tracking-tight">{m.lobby_title()}</h1>
-		<a href={resolve('/')} class="text-sm text-neutral-500 underline underline-offset-4">
+		<a href={resolve('/')} class="text-sm text-muted underline underline-offset-4">
 			{m.app_name()}
 		</a>
 	</header>
 
 	{#if error}
-		<p
-			class="rounded-lg bg-red-100 px-4 py-3 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
-			role="alert"
-		>
+		<p class="px-panel border-danger px-4 py-3 text-sm text-danger" role="alert">
 			{error}
 		</p>
 	{/if}
 
 	<section class="flex flex-col gap-3">
-		<h2 class="text-sm font-semibold text-neutral-500 uppercase">{m.lobby_join_title()}</h2>
+		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_join_title()}</h2>
 		<form method="POST" action="?/join" class="flex gap-2" use:enhance>
 			<input
 				name="code"
@@ -57,30 +53,28 @@
 				placeholder={m.lobby_join_code()}
 				class="{field} min-w-0 flex-1 font-mono tracking-widest uppercase"
 			/>
-			<button
-				class="rounded-lg bg-neutral-800 px-4 py-3 font-medium text-white dark:bg-neutral-200 dark:text-neutral-900"
-			>
+			<button class="px-btn px-4 py-3 font-bold">
 				{m.lobby_join_submit()}
 			</button>
 		</form>
 	</section>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="text-sm font-semibold text-neutral-500 uppercase">{m.lobby_open_games()}</h2>
+		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_open_games()}</h2>
 
 		{#if data.games.length === 0}
-			<p class="text-neutral-500">{m.lobby_no_games()}</p>
+			<p class="text-muted">{m.lobby_no_games()}</p>
 		{:else}
 			<ul class="flex flex-col gap-2">
 				{#each data.games as game (game.id)}
 					<li>
 						<a
 							href={resolve('/games/[code]', { code: game.code })}
-							class="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
+							class="px-panel flex items-center justify-between gap-3 p-4"
 						>
 							<span class="min-w-0">
 								<span class="block truncate font-medium">{game.name}</span>
-								<span class="block text-sm text-neutral-500">
+								<span class="block text-sm text-muted">
 									{m.lobby_seats({ seated: game.seated, max: game.maxSeats })}
 									· {game.smallBlind}/{game.bigBlind}
 									{#if game.realMoney}· {m.game_real_money()}{/if}
@@ -88,9 +82,14 @@
 							</span>
 							<span class="flex shrink-0 flex-col items-end gap-1">
 								<span class="font-mono text-sm tracking-widest">{game.code}</span>
-								<span class="text-xs text-neutral-500">
+								<span class="text-xs text-muted">
 									{game.status === 'running' ? m.game_status_running() : m.game_status_lobby()}
 								</span>
+								{#if game.youAreSeated}
+									<span class="border-2 border-gold px-1 text-[0.6rem] text-gold">
+										{m.lobby_you_are_in()}
+									</span>
+								{/if}
 							</span>
 						</a>
 					</li>
@@ -100,7 +99,7 @@
 	</section>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="text-sm font-semibold text-neutral-500 uppercase">{m.lobby_new_game()}</h2>
+		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_new_game()}</h2>
 
 		<form
 			method="POST"
@@ -122,15 +121,11 @@
 			<fieldset class="flex flex-col gap-2">
 				<legend class="text-sm font-medium">{m.game_money_mode()}</legend>
 				<div class="grid grid-cols-2 gap-2">
-					<label
-						class="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-3 dark:border-neutral-700"
-					>
+					<label class="px-field flex items-center gap-2 px-3 py-3">
 						<input type="radio" name="realMoney" value="false" bind:group={moneyMode} />
 						<span class="text-sm">{m.game_play_money()}</span>
 					</label>
-					<label
-						class="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-3 dark:border-neutral-700"
-					>
+					<label class="px-field flex items-center gap-2 px-3 py-3">
 						<input type="radio" name="realMoney" value="true" bind:group={moneyMode} />
 						<span class="text-sm">{m.game_real_money()}</span>
 					</label>
@@ -141,13 +136,13 @@
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium">{m.game_boks_code()}</span>
 					<input name="vippsBoksCode" class={field} />
-					<span class="text-xs text-neutral-500">{m.game_boks_hint()}</span>
+					<span class="text-xs text-muted">{m.game_boks_hint()}</span>
 				</label>
 
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium">{m.game_buy_in()}</span>
 					<input name="buyInKr" inputmode="decimal" class={field} />
-					<span class="text-xs text-neutral-500">{m.game_buy_in_hint()}</span>
+					<span class="text-xs text-muted">{m.game_buy_in_hint()}</span>
 				</label>
 			{/if}
 
@@ -186,17 +181,13 @@
 			<label class="flex flex-col gap-1.5">
 				<span class="text-sm font-medium">
 					{m.game_voice_url()}
-					<span class="font-normal text-neutral-500">({m.auth_optional()})</span>
+					<span class="font-normal text-muted">({m.auth_optional()})</span>
 				</span>
 				<input name="voiceChatUrl" type="url" placeholder="https://…" class={field} />
-				<span class="text-xs text-neutral-500">{m.game_voice_hint()}</span>
+				<span class="text-xs text-muted">{m.game_voice_hint()}</span>
 			</label>
 
-			<button
-				type="submit"
-				disabled={creating}
-				class="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white disabled:opacity-60"
-			>
+			<button type="submit" disabled={creating} class="px-btn px-btn-primary px-4 py-4 font-bold">
 				{m.game_create_submit()}
 			</button>
 		</form>
