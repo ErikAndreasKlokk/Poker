@@ -63,9 +63,19 @@ export interface TableView {
 	smallBlind: number;
 	bigBlind: number;
 	maxSeats: number;
+	/** Length of the action clock, so the client can render it as a fraction. */
+	turnSeconds: number;
 	seats: SeatView[];
 	board: Card[];
+	/** Side-pot breakdown, only built once a hand is settled. */
 	pots: PotView[];
+	/**
+	 * Chips in the middle from completed streets. Excludes the current street's
+	 * bets, which are shown in front of each seat, so nothing is counted twice.
+	 */
+	potTotal: number;
+	/** Highest amount committed on the current street. */
+	currentBet: number;
 	street: Street | null;
 	button: number | null;
 	toAct: number | null;

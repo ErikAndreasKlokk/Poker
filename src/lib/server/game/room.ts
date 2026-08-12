@@ -405,6 +405,14 @@ export class GameRoom {
 
 		const myTurn = !!hand && me != null && hand.toAct === me.seat;
 
+		// Settled pots are authoritative once they exist; mid-hand we derive the
+		// pot from committed chips, minus the current street shown at each seat.
+		const potTotal = hand
+			? hand.pots.length > 0
+				? hand.pots.reduce((sum, p) => sum + p.amount, 0)
+				: hand.seats.reduce((sum, s) => sum + s.totalCommitted - s.committed, 0)
+			: 0;
+
 		return {
 			code: this.game.code,
 			name: this.game.name,
@@ -416,9 +424,12 @@ export class GameRoom {
 			smallBlind: this.game.smallBlind,
 			bigBlind: this.game.bigBlind,
 			maxSeats: this.game.maxSeats,
+			turnSeconds: this.game.turnSeconds,
 			seats,
 			board: hand?.board ?? [],
 			pots: hand?.pots.map((p) => ({ amount: p.amount, eligibleSeats: p.eligibleSeats })) ?? [],
+			potTotal,
+			currentBet: hand?.currentBet ?? 0,
 			street: hand?.street ?? null,
 			button: hand ? hand.button : null,
 			toAct: hand?.toAct ?? null,
