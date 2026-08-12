@@ -9,8 +9,10 @@ import {
 	serial,
 	text,
 	timestamp,
-	unique
+	unique,
+	uniqueIndex
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /** Postgres `bytea`; drizzle has no built-in for it. */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -148,8 +150,15 @@ export const gamePlayer = pgTable(
 		leftAt: timestamp('left_at', { withTimezone: true })
 	},
 	(t) => [
-		unique('game_player_seat_unique').on(t.gameId, t.seat),
-		unique('game_player_user_unique').on(t.gameId, t.userId)
+		// Partial, so a departed row blocks nothing. Unconditional uniques made
+		// leaving a one-way door: the player could never sit again, and the seat
+		// itself was retired for the rest of the game.
+		uniqueIndex('game_player_seat_unique')
+			.on(t.gameId, t.seat)
+			.where(sql`${t.leftAt} is null`),
+		uniqueIndex('game_player_user_unique')
+			.on(t.gameId, t.userId)
+			.where(sql`${t.leftAt} is null`)
 	]
 );
 

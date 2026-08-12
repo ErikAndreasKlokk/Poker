@@ -223,6 +223,9 @@
 								isYou={seat?.userId === table.you.userId}
 								canSit={mySeat === null && table.status !== 'ended'}
 								betsAbove={position.top > 50}
+								reaction={seat
+									? (connection?.reactions.find((r) => r.userId === seat.userId) ?? null)
+									: null}
 								clock={table.toAct === index && msLeft !== null
 									? Math.min(1, msLeft / (table.turnSeconds * 1000))
 									: null}

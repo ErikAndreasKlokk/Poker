@@ -154,11 +154,11 @@ export function attachGameServer(server: Server, db: Db) {
 				case 'act':
 					return await room.act(client.userId, message.action);
 				case 'chat': {
-					const posted = await room.chat(client.userId, message.body);
+					const posted = await room.chat(client.userId, client.username, message.body);
 					return broadcast(code, { type: 'chat', message: posted });
 				}
 				case 'reaction': {
-					const posted = await room.chat(client.userId, message.emoji, 'reaction');
+					const posted = await room.chat(client.userId, client.username, message.emoji, 'reaction');
 					return broadcast(code, { type: 'chat', message: posted });
 				}
 				default:

@@ -514,8 +514,16 @@ export class GameRoom {
 
 	// --- Chat -------------------------------------------------------------
 
-	async chat(userId: string, body: string, kind: 'chat' | 'reaction' = 'chat'): Promise<ChatView> {
-		const player = this.players.get(userId);
+	/**
+	 * @param username taken from the connection rather than the seated players,
+	 *   so someone watching from the rail still posts under their own name
+	 */
+	async chat(
+		userId: string,
+		username: string,
+		body: string,
+		kind: 'chat' | 'reaction' = 'chat'
+	): Promise<ChatView> {
 		const trimmed = body.trim().slice(0, 500);
 		if (!trimmed) throw new RoomError('empty_message');
 		// Reactions come from a fixed set, so a client cannot smuggle arbitrary
@@ -529,14 +537,7 @@ export class GameRoom {
 			.values({ gameId: this.game.id, userId, kind, body: trimmed })
 			.returning();
 
-		return {
-			id: row.id,
-			userId,
-			username: player?.username ?? '',
-			kind,
-			body: trimmed,
-			at: row.createdAt.getTime()
-		};
+		return { id: row.id, userId, username, kind, body: trimmed, at: row.createdAt.getTime() };
 	}
 
 	/** Recent chat, oldest first, so a joining client can render the backlog. */

@@ -15,6 +15,7 @@
 		/** 0–1 of the action clock remaining; null when this seat isn't on the clock. */
 		clock = null,
 		betsAbove = false,
+		reaction = null,
 		onsit
 	}: {
 		seat?: SeatView | null;
@@ -27,6 +28,8 @@
 		clock?: number | null;
 		/** Put the wager on the centre side of the seat, as chips sit on a real table. */
 		betsAbove?: boolean;
+		/** A reaction to float over this seat, keyed so a repeat replays it. */
+		reaction?: { id: number; emoji: string } | null;
 		onsit?: (seat: number) => void;
 	} = $props();
 </script>
@@ -80,6 +83,17 @@
 				>
 					D
 				</span>
+			{/if}
+
+			{#if reaction}
+				<!-- Keyed on the id so reacting twice replays the animation. -->
+				{#key reaction.id}
+					<span
+						class="px-reaction pointer-events-none absolute -top-2 left-1/2 z-20 text-3xl drop-shadow-[2px_2px_0_#000]"
+					>
+						{reaction.emoji}
+					</span>
+				{/key}
 			{/if}
 
 			<img

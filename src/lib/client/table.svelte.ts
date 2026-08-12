@@ -10,9 +10,20 @@ const PING_INTERVAL_MS = 25_000;
  * The socket is the only source of table state — nothing is derived optimistically
  * on the client, because the server is the authority on every chip and card.
  */
+export interface FloatingReaction {
+	id: number;
+	userId: string;
+	emoji: string;
+}
+
+/** How long a reaction hangs over its seat before fading out. */
+const REACTION_MS = 2400;
+
 export class TableConnection {
 	table = $state<TableView | null>(null);
 	chat = $state<ChatView[]>([]);
+	/** Reactions currently animating over a seat; never shown in the chat log. */
+	reactions = $state<FloatingReaction[]>([]);
 	error = $state<string | null>(null);
 	connected = $state(false);
 
@@ -43,6 +54,26 @@ export class TableConnection {
 		}
 	}
 
+	/**
+	 * Floats a reaction over its sender's seat for a moment.
+	 *
+	 * Only the sender's most recent one is kept, so hammering the buttons
+	 * restarts the animation instead of piling emoji up over one seat.
+	 */
+	private pop(message: ChatView) {
+		if (!message.userId) return;
+		const reaction = { id: message.id, userId: message.userId, emoji: message.body };
+
+		this.reactions = [
+			...this.reactions.filter((existing) => existing.userId !== reaction.userId),
+			reaction
+		];
+
+		setTimeout(() => {
+			this.reactions = this.reactions.filter((existing) => existing.id !== reaction.id);
+		}, REACTION_MS);
+	}
+
 	private connect() {
 		const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
 		const socket = new WebSocket(`${scheme}://${location.host}/ws/game/${this.code}`);
@@ -68,11 +99,13 @@ export class TableConnection {
 					this.table = message.table;
 					break;
 				case 'chat':
-					this.chat = [...this.chat, message.message].slice(-200);
+					if (message.message.kind === 'reaction') this.pop(message.message);
+					else this.chat = [...this.chat, message.message].slice(-200);
 					break;
 				case 'chat_history':
 					// Replaces rather than merges: the backlog is authoritative on connect.
-					this.chat = message.messages;
+					// Past reactions are moments, not messages, so they are dropped.
+					this.chat = message.messages.filter((entry) => entry.kind !== 'reaction');
 					break;
 				case 'error':
 					this.error = message.message;
