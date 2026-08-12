@@ -5,7 +5,7 @@ import type { Action } from '../../poker/engine';
 import { applyAction, legalActions, startHand, type HandState } from '../../poker/engine';
 import { evaluate } from '../../poker/evaluate';
 import { REACTIONS, type ChatView, type SeatView, type TableView } from '../../protocol';
-import { cashOutAmounts } from '../settlement';
+import { boksFeeOre, chipsToOre, distributePool } from '../settlement';
 
 /** Delay between a hand finishing and the next one being dealt. */
 const NEXT_HAND_DELAY_MS = 6000;
@@ -253,13 +253,17 @@ export class GameRoom {
 				.filter((row) => row.type !== 'cash_out')
 				.reduce((sum, row) => sum + row.amountOre, 0);
 
+			// Anyone who left mid-session already took their share out of the Boks.
+			const alreadyOutOre = rows
+				.filter((row) => row.type === 'cash_out')
+				.reduce((sum, row) => sum + row.amountOre, 0);
+
+			// Vipps keeps 19 kr per whole 1000 kr held, so the Boks pays out less
+			// than went in. Everyone still holding chips absorbs it proportionally.
+			const poolOre = Math.max(0, paidInOre - boksFeeOre(paidInOre) - alreadyOutOre);
+
 			const stacks = new Map([...this.players.values()].map((p) => [p.userId, p.stack]));
-			const amounts = cashOutAmounts(
-				stacks,
-				this.game.buyInOre ?? 0,
-				this.game.startingStack,
-				paidInOre
-			);
+			const amounts = distributePool(stacks, poolOre);
 
 			await this.db.insert(schema.ledgerEntry).values(
 				[...amounts].map(([cashOutUserId, amountOre]) => ({
@@ -294,10 +298,30 @@ export class GameRoom {
 		}
 
 		this.players.delete(userId);
-		await this.db
-			.update(schema.gamePlayer)
-			.set({ leftAt: new Date(), status: 'left' })
-			.where(and(eq(schema.gamePlayer.gameId, this.game.id), eq(schema.gamePlayer.userId, userId)));
+
+		await this.db.transaction(async (tx) => {
+			await tx
+				.update(schema.gamePlayer)
+				.set({ leftAt: new Date(), status: 'left' })
+				.where(
+					and(eq(schema.gamePlayer.gameId, this.game.id), eq(schema.gamePlayer.userId, userId))
+				);
+
+			// Leaving the table is cashing out. Without this the player's buy-in
+			// would stay recorded with nothing coming back, and the end-of-session
+			// settlement would quietly hand their money to whoever was still sitting.
+			if (this.game.realMoney && player.stack > 0) {
+				await tx.insert(schema.ledgerEntry).values({
+					gameId: this.game.id,
+					userId,
+					type: 'cash_out',
+					chips: player.stack,
+					amountOre: chipsToOre(player.stack, this.game.buyInOre ?? 0, this.game.startingStack),
+					recordedByUserId: userId
+				});
+			}
+		});
+
 		this.onChange();
 	}
 

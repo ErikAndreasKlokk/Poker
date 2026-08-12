@@ -31,38 +31,31 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		.from(schema.ledgerEntry)
 		.where(eq(schema.ledgerEntry.gameId, game.id));
 
+	// No phone numbers here: money moves through the Boks, so nobody needs
+	// another player's number to settle up.
 	const players = await db
-		.select({
-			id: schema.user.id,
-			username: schema.user.username,
-			phone: schema.user.phone
-		})
+		.select({ id: schema.user.id, username: schema.user.username })
 		.from(schema.gamePlayer)
 		.innerJoin(schema.user, eq(schema.user.id, schema.gamePlayer.userId))
 		.where(eq(schema.gamePlayer.gameId, game.id));
 
-	const { lines, transfers } = computeSettlement(rows);
+	const ended = game.status === 'ended';
+	const { lines, paidInOre, feeOre, payoutOre } = computeSettlement(rows, ended);
 
 	const byId = new Map(players.map((p) => [p.id, p]));
-	const name = (id: string) => byId.get(id)?.username ?? '?';
 
 	return {
 		code: game.code,
 		name: game.name,
 		realMoney: game.realMoney,
-		status: game.status,
+		ended,
 		vippsBoksCode: game.vippsBoksCode,
+		paidInOre,
+		feeOre,
+		payoutOre,
 		lines: lines.map((line) => ({
 			...line,
-			username: name(line.userId),
-			// Only the payee's number is shown, and only to people who played.
-			phone: byId.get(line.userId)?.phone ?? null
-		})),
-		transfers: transfers.map((transfer) => ({
-			...transfer,
-			fromUsername: name(transfer.fromUserId),
-			toUsername: name(transfer.toUserId),
-			toPhone: byId.get(transfer.toUserId)?.phone ?? null
+			username: byId.get(line.userId)?.username ?? '?'
 		}))
 	};
 };

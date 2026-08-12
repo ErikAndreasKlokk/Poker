@@ -6,17 +6,8 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let copied = $state<string | null>(null);
-
-	async function copy(text: string, key: string) {
-		try {
-			await navigator.clipboard.writeText(text);
-			copied = key;
-			setTimeout(() => (copied = null), 2000);
-		} catch {
-			// Clipboard can be blocked; the number is on screen to type manually.
-		}
-	}
+	// Everyone still holding chips has something to take out; the rest are done.
+	const withdrawals = $derived(data.lines.filter((line) => line.paidOutOre > 0));
 </script>
 
 <svelte:head><title>{m.settle_title()} · {data.name}</title></svelte:head>
@@ -39,47 +30,57 @@
 		<p class="rounded-lg bg-neutral-100 px-4 py-3 text-sm dark:bg-neutral-900">
 			{m.settle_play_money()}
 		</p>
-	{:else if data.status !== 'ended'}
-		<p
-			class="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+	{:else}
+		{#if !data.ended}
+			<p
+				class="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+			>
+				{m.settle_not_ended()}
+			</p>
+		{/if}
+
+		<!-- What the Boks holds, what Vipps keeps, what is left to take out. -->
+		<section
+			class="flex flex-col gap-1 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
 		>
-			{m.settle_not_ended()}
-		</p>
-	{/if}
+			<div class="flex items-baseline justify-between gap-3">
+				<span class="text-sm text-neutral-500">{m.settle_in_boks()}</span>
+				<span class="font-medium tabular-nums">{formatOre(data.paidInOre)}</span>
+			</div>
+			<div class="flex items-baseline justify-between gap-3">
+				<span class="text-sm text-neutral-500">{m.settle_fee()}</span>
+				<span class="font-medium text-rose-600 tabular-nums">−{formatOre(data.feeOre)}</span>
+			</div>
+			<div
+				class="mt-1 flex items-baseline justify-between gap-3 border-t border-neutral-200 pt-2 dark:border-neutral-800"
+			>
+				<span class="text-sm font-medium">{m.settle_available()}</span>
+				<span class="text-lg font-semibold tabular-nums">{formatOre(data.payoutOre)}</span>
+			</div>
+			<p class="mt-1 text-xs text-neutral-500">{m.settle_fee_hint()}</p>
+		</section>
 
-	{#if data.realMoney}
 		<section class="flex flex-col gap-3">
-			<h2 class="text-sm font-semibold text-neutral-500 uppercase">{m.settle_payments()}</h2>
+			<h2 class="text-sm font-semibold text-neutral-500 uppercase">{m.settle_withdrawals()}</h2>
 
-			{#if data.transfers.length === 0}
-				<p class="text-neutral-500">{m.settle_all_square()}</p>
+			{#if !data.ended}
+				<p class="text-sm text-neutral-500">{m.settle_pending()}</p>
+			{:else if withdrawals.length === 0}
+				<p class="text-neutral-500">{m.settle_nothing_to_withdraw()}</p>
 			{:else}
 				<ul class="flex flex-col gap-2">
-					{#each data.transfers as transfer (transfer.fromUserId + transfer.toUserId)}
+					{#each withdrawals as line (line.userId)}
 						<li
-							class="flex flex-col gap-2 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
+							class="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800"
 						>
-							<p class="text-sm">
-								<strong>{transfer.fromUsername}</strong>
-								{m.settle_pays()}
-								<strong>{transfer.toUsername}</strong>
-							</p>
-							<p class="text-2xl font-semibold tabular-nums">
-								{formatOre(transfer.amountOre)}
-							</p>
-							{#if transfer.toPhone}
-								<button
-									type="button"
-									onclick={() => copy(transfer.toPhone!, transfer.toUserId)}
-									class="self-start rounded-lg bg-neutral-100 px-3 py-2 font-mono text-sm dark:bg-neutral-800"
-								>
-									{copied === transfer.toUserId ? m.settle_copied() : transfer.toPhone}
-								</button>
-							{/if}
+							<span class="min-w-0 truncate font-medium">{line.username}</span>
+							<span class="shrink-0 text-xl font-semibold tabular-nums">
+								{formatOre(line.paidOutOre)}
+							</span>
 						</li>
 					{/each}
 				</ul>
-				<p class="text-xs text-neutral-500">{m.settle_vipps_hint()}</p>
+				<p class="text-xs text-neutral-500">{m.settle_withdraw_hint()}</p>
 			{/if}
 		</section>
 

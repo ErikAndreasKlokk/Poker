@@ -1,11 +1,16 @@
 /**
- * Turning a session into "who Vippser whom".
+ * Turning a session into what each player takes out of the Vipps Boks.
+ *
+ * The Boks is the pot: buy-ins are paid in, and at the end everyone withdraws
+ * what their chips are worth. Nobody can owe anyone, because nobody can lose
+ * more than they bought in — so there are no player-to-player payments, only
+ * withdrawals.
  *
  * Pure and free of database imports so it can be unit-tested: this is the part
- * of the app where a bug costs someone real money, and the Vipps Boks gives us
- * no way to verify anything after the fact.
+ * of the app where a bug costs someone real money, and the Boks gives us no way
+ * to verify anything after the fact.
  *
- * Every amount is integer øre. Chips are converted once, at cash-out.
+ * Every amount is integer øre.
  */
 
 export type LedgerType = 'buy_in' | 'rebuy' | 'cash_out';
@@ -19,28 +24,42 @@ export interface LedgerRow {
 
 export interface SettlementLine {
 	userId: string;
-	/** Everything this player put in, in øre. */
+	/** Everything this player put into the Boks, in øre. */
 	paidInOre: number;
-	/** Everything they took back out, in øre. */
+	/** What they take back out, in øre. */
 	paidOutOre: number;
-	/** Positive means they are owed money, negative means they owe it. */
+	/** Positive means they finished the night up. */
 	netOre: number;
-}
-
-export interface Transfer {
-	fromUserId: string;
-	toUserId: string;
-	amountOre: number;
 }
 
 export interface Settlement {
 	lines: SettlementLine[];
-	transfers: Transfer[];
+	/** Total paid into the Boks across the session. */
+	paidInOre: number;
+	/** Vipps' cut, derived from what actually went out. */
+	feeOre: number;
+	/** What is left for players to withdraw. */
+	payoutOre: number;
+}
+
+/** 19 kr, in øre. */
+export const BOKS_FEE_PER_THOUSAND_ORE = 1900;
+const THOUSAND_KRONER_IN_ORE = 100_000;
+
+/**
+ * Vipps takes 19 kr for each whole 1000 kr held in a Boks.
+ *
+ * Whole thousands only: 1250 kr is charged the same 19 kr as 1000 kr, and
+ * nothing at all is charged below 1000 kr.
+ */
+export function boksFeeOre(totalOre: number): number {
+	if (totalOre <= 0) return 0;
+	return Math.floor(totalOre / THOUSAND_KRONER_IN_ORE) * BOKS_FEE_PER_THOUSAND_ORE;
 }
 
 /**
- * Converts a chip stack to øre at the game's buy-in rate.
- * A stack equal to `startingStack` is worth exactly one buy-in.
+ * Converts a chip stack to øre at the game's buy-in rate, ignoring the fee.
+ * Used when a player cashes out mid-session by leaving the table.
  */
 export function chipsToOre(chips: number, buyInOre: number, startingStack: number): number {
 	if (startingStack <= 0) throw new Error('startingStack must be positive');
@@ -48,29 +67,35 @@ export function chipsToOre(chips: number, buyInOre: number, startingStack: numbe
 }
 
 /**
- * Works out what each player is cashing out, in øre.
+ * Splits the payout pool across final stacks, proportional to chips.
  *
- * Rounding each stack independently can drift a few øre away from the money
- * actually paid in, which would leave the settlement unable to balance. The
- * drift is absorbed by the biggest stack, so the totals always match.
+ * Because the pool is already short by the fee, everyone's share shrinks by the
+ * same percentage — which is exactly what happens physically, since the Boks
+ * simply holds less than went into it. A player who busted holds no chips and
+ * so carries none of the fee.
  *
- * @param stacks final chip stack per player
- * @param paidInOre total put in across the whole session
+ * Rounding each share independently can drift a few øre from the pool, which
+ * would leave money stranded in the Boks; the drift goes to the biggest stack.
  */
-export function cashOutAmounts(
+export function distributePool(
 	stacks: ReadonlyMap<string, number>,
-	buyInOre: number,
-	startingStack: number,
-	paidInOre: number
+	poolOre: number
 ): Map<string, number> {
 	const amounts = new Map<string, number>();
+	const totalChips = [...stacks.values()].reduce((sum, chips) => sum + chips, 0);
+
+	if (totalChips <= 0 || poolOre <= 0) {
+		for (const userId of stacks.keys()) amounts.set(userId, 0);
+		return amounts;
+	}
+
 	for (const [userId, chips] of stacks) {
-		amounts.set(userId, chipsToOre(chips, buyInOre, startingStack));
+		amounts.set(userId, Math.round((chips * poolOre) / totalChips));
 	}
 
 	const total = [...amounts.values()].reduce((sum, value) => sum + value, 0);
-	const drift = paidInOre - total;
-	if (drift !== 0 && amounts.size > 0) {
+	const drift = poolOre - total;
+	if (drift !== 0) {
 		const [biggest] = [...amounts.entries()].sort((a, b) => b[1] - a[1]);
 		amounts.set(biggest[0], biggest[1] + drift);
 	}
@@ -100,49 +125,18 @@ export function computeLines(rows: readonly LedgerRow[]): SettlementLine[] {
 }
 
 /**
- * Reduces the nets to a short list of payments.
- *
- * Repeatedly settles the biggest debt against the biggest credit, which needs
- * at most one payment fewer than there are players — the point being that five
- * people settle in three Vipps payments instead of ten.
- *
- * (Finding the provably shortest list is NP-hard; this greedy pairing is the
- * standard practical answer and is optimal for the sizes a home game reaches.)
+ * @param rows every ledger entry for the game
+ * @param ended once the session is closed the fee is whatever the Boks actually
+ *   kept; while it is still running we can only project it from the rule
  */
-export function minimizeTransfers(lines: readonly SettlementLine[]): Transfer[] {
-	const debtors = lines
-		.filter((line) => line.netOre < 0)
-		.map((line) => ({ userId: line.userId, amount: -line.netOre }))
-		.sort((a, b) => b.amount - a.amount);
-
-	const creditors = lines
-		.filter((line) => line.netOre > 0)
-		.map((line) => ({ userId: line.userId, amount: line.netOre }))
-		.sort((a, b) => b.amount - a.amount);
-
-	const transfers: Transfer[] = [];
-	let d = 0;
-	let c = 0;
-
-	while (d < debtors.length && c < creditors.length) {
-		const amount = Math.min(debtors[d].amount, creditors[c].amount);
-		if (amount > 0) {
-			transfers.push({
-				fromUserId: debtors[d].userId,
-				toUserId: creditors[c].userId,
-				amountOre: amount
-			});
-		}
-		debtors[d].amount -= amount;
-		creditors[c].amount -= amount;
-		if (debtors[d].amount === 0) d++;
-		if (creditors[c].amount === 0) c++;
-	}
-
-	return transfers;
-}
-
-export function computeSettlement(rows: readonly LedgerRow[]): Settlement {
+export function computeSettlement(rows: readonly LedgerRow[], ended: boolean): Settlement {
 	const lines = computeLines(rows);
-	return { lines, transfers: minimizeTransfers(lines) };
+	const paidInOre = lines.reduce((sum, line) => sum + line.paidInOre, 0);
+	const payoutOre = lines.reduce((sum, line) => sum + line.paidOutOre, 0);
+
+	// After the fact the gap between in and out is the fee that was applied, so
+	// a later change to the fee rule cannot rewrite a settled night's history.
+	const feeOre = ended ? Math.max(0, paidInOre - payoutOre) : boksFeeOre(paidInOre);
+
+	return { lines, paidInOre, feeOre, payoutOre: ended ? payoutOre : paidInOre - feeOre };
 }

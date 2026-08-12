@@ -273,11 +273,12 @@ olaWs.socket.close();
 
 // --- Real-money session and settlement ------------------------------------
 
+// 500 kr each puts exactly 1000 kr in the Boks, so the 19 kr fee applies.
 res = await erik.post('/games?/create', {
 	name: 'Money night',
 	realMoney: 'true',
 	vippsBoksCode: 'BOKS123',
-	buyInKr: '250',
+	buyInKr: '500',
 	smallBlind: '10',
 	bigBlind: '20',
 	startingStack: '1000',
@@ -319,8 +320,16 @@ res = await erik.get(`/games/${moneyCode}/settlement`);
 const settlement = await res.text();
 check('settlement page renders', res.status === 200, `status ${res.status}`);
 
-// 1000 chips cost 250 kr, so a chip is 25 øre and the 10-chip swing is 2,50 kr.
-check('settlement shows the exact amount owed', settlement.includes('2,50 kr'), '2,50 kr');
+// Two 500 kr buy-ins is 1000 kr in the Boks: one whole thousand, so 19 kr goes
+// to Vipps and 981 kr is left for the players to withdraw.
+check('settlement shows what is in the boks', settlement.includes('1000,00 kr'), '1000,00 kr');
+check('settlement shows the vipps fee', settlement.includes('19,00 kr'), '19,00 kr');
+check('settlement shows what is left to withdraw', settlement.includes('981,00 kr'), '981,00 kr');
+
+// The 10-chip small blind the folder lost, scaled to the reduced pool: the
+// winner takes 495,40 kr and the loser 485,60 kr, together exactly 981 kr.
+check('winner withdraws their share of the reduced pool', settlement.includes('495,40 kr'));
+check('loser withdraws their share of the reduced pool', settlement.includes('485,60 kr'));
 
 const loser = erikMoney.table.seats.find((s) => s.stack === 990);
 check('losing stack is one small blind down', loser !== undefined);
