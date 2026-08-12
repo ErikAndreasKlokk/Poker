@@ -149,13 +149,17 @@ export class GameRoom {
 
 	// --- Seating ----------------------------------------------------------
 
-	async sit(userId: string, username: string, seat: number) {
+	/**
+	 * @param buyInChips how much to sit down with, capped at the table's maximum.
+	 *   Omitted means a full stack.
+	 */
+	async sit(userId: string, username: string, seat: number, buyInChips?: number) {
 		if (this.game.status === 'ended') throw new RoomError('game_ended');
 		if (this.players.has(userId)) throw new RoomError('already_seated');
 		if (seat < 0 || seat >= this.game.maxSeats) throw new RoomError('bad_seat');
 		if ([...this.players.values()].some((p) => p.seat === seat)) throw new RoomError('seat_taken');
 
-		const stack = this.game.startingStack;
+		const stack = this.validBuyIn(buyInChips ?? this.game.startingStack);
 
 		await this.db.transaction(async (tx) => {
 			await tx.insert(schema.gamePlayer).values({
@@ -174,7 +178,8 @@ export class GameRoom {
 					userId,
 					type: 'buy_in',
 					chips: stack,
-					amountOre: this.game.buyInOre ?? 0,
+					// Priced from the chips actually taken, so a short buy-in costs less.
+					amountOre: chipsToOre(stack, this.game.buyInOre ?? 0, this.game.startingStack),
 					recordedByUserId: userId
 				});
 			}
@@ -184,6 +189,38 @@ export class GameRoom {
 		this.onChange();
 		// Someone joining a running table may be the second player it needed.
 		this.maybeResume();
+	}
+
+	/**
+	 * Matches only a player's current stint at this table.
+	 *
+	 * A player can have several rows here once they have left and come back, so
+	 * an update keyed on game and user alone would rewrite their whole history —
+	 * stamping every past departure with today's timestamp.
+	 */
+	private activeSeatOf(userId: string) {
+		return and(
+			eq(schema.gamePlayer.gameId, this.game.id),
+			eq(schema.gamePlayer.userId, userId),
+			isNull(schema.gamePlayer.leftAt)
+		);
+	}
+
+	/**
+	 * Clamps a requested buy-in to what the table allows.
+	 *
+	 * The maximum is the starting stack set when the game was created; the
+	 * minimum is one big blind, below which a player could not even post.
+	 */
+	private validBuyIn(chips: number): number {
+		const max = this.game.startingStack;
+		const min = Math.min(this.game.bigBlind, max);
+		const wanted = Math.floor(chips);
+
+		if (!Number.isFinite(wanted) || wanted < min || wanted > max) {
+			throw new RoomError('invalid_buy_in');
+		}
+		return wanted;
 	}
 
 	/**
@@ -201,24 +238,27 @@ export class GameRoom {
 			throw new RoomError('wait_for_next_hand');
 		}
 
-		player.stack += this.game.startingStack;
+		// Tops up to the table maximum rather than adding a whole stack on top of
+		// whatever is left, which could otherwise exceed the cap set at creation.
+		const topUp = this.game.startingStack - player.stack;
+		if (topUp <= 0) throw new RoomError('already_at_max');
+
+		player.stack += topUp;
 		player.sittingOut = false;
 
 		await this.db.transaction(async (tx) => {
 			await tx
 				.update(schema.gamePlayer)
 				.set({ stack: player.stack, status: 'active' })
-				.where(
-					and(eq(schema.gamePlayer.gameId, this.game.id), eq(schema.gamePlayer.userId, userId))
-				);
+				.where(this.activeSeatOf(userId));
 
 			if (this.game.realMoney) {
 				await tx.insert(schema.ledgerEntry).values({
 					gameId: this.game.id,
 					userId,
 					type: 'rebuy',
-					chips: this.game.startingStack,
-					amountOre: this.game.buyInOre ?? 0,
+					chips: topUp,
+					amountOre: chipsToOre(topUp, this.game.buyInOre ?? 0, this.game.startingStack),
 					recordedByUserId: userId
 				});
 			}
@@ -303,9 +343,7 @@ export class GameRoom {
 			await tx
 				.update(schema.gamePlayer)
 				.set({ leftAt: new Date(), status: 'left' })
-				.where(
-					and(eq(schema.gamePlayer.gameId, this.game.id), eq(schema.gamePlayer.userId, userId))
-				);
+				.where(this.activeSeatOf(userId));
 
 			// Leaving the table is cashing out. Without this the player's buy-in
 			// would stay recorded with nothing coming back, and the end-of-session
@@ -452,12 +490,7 @@ export class GameRoom {
 				await tx
 					.update(schema.gamePlayer)
 					.set({ stack: player.stack })
-					.where(
-						and(
-							eq(schema.gamePlayer.gameId, this.game.id),
-							eq(schema.gamePlayer.userId, player.userId)
-						)
-					);
+					.where(this.activeSeatOf(player.userId));
 			}
 			await tx
 				.update(schema.hand)

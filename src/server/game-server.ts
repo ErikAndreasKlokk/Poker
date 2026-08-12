@@ -142,7 +142,7 @@ export function attachGameServer(server: Server, db: Db) {
 				case 'ping':
 					return send(client, { type: 'pong' });
 				case 'sit':
-					return await room.sit(client.userId, client.username, message.seat);
+					return await room.sit(client.userId, client.username, message.seat, message.buyIn);
 				case 'leave':
 					return await room.leave(client.userId);
 				case 'start':

@@ -15,6 +15,10 @@
 	let connection = $state<TableConnection | null>(null);
 	let chatDraft = $state('');
 
+	/** Seat being sat down at, while the buy-in amount is chosen. */
+	let pendingSeat = $state<number | null>(null);
+	let buyIn = $state(0);
+
 	// Keyed on the code so navigating straight from one table to another tears
 	// down the old socket instead of leaving it open.
 	$effect(() => {
@@ -64,7 +68,9 @@
 		already_seated: m.error_already_seated,
 		need_two_players: m.error_need_two_players,
 		not_your_turn: m.error_not_your_turn,
-		game_ended: m.error_game_ended
+		game_ended: m.error_game_ended,
+		invalid_buy_in: m.error_invalid_buy_in,
+		already_at_max: m.error_already_at_max
 	};
 	const errorText = $derived(socketError ? (errorMessages[socketError]?.() ?? socketError) : null);
 
@@ -109,6 +115,19 @@
 
 	function act(action: Action) {
 		send({ type: 'act', action });
+	}
+
+	/** Opens the buy-in chooser rather than sitting down straight away. */
+	function chooseSeat(seat: number) {
+		if (!table) return;
+		pendingSeat = seat;
+		buyIn = table.startingStack;
+	}
+
+	function confirmSeat() {
+		if (pendingSeat === null) return;
+		send({ type: 'sit', seat: pendingSeat, buyIn });
+		pendingSeat = null;
 	}
 
 	function sendChat(event: SubmitEvent) {
@@ -207,6 +226,56 @@
 						{/if}
 					</div>
 
+					{#if pendingSeat !== null}
+						{@const min = Math.min(table.bigBlind, table.startingStack)}
+						<!-- Sits on top of the felt so the table stays visible behind it. -->
+						<div
+							class="px-panel absolute top-1/2 left-1/2 z-30 flex w-64 -translate-x-1/2 -translate-y-1/2 flex-col gap-3 p-4"
+						>
+							<span class="font-arcade text-xs text-gold">{m.table_buy_in_title()}</span>
+
+							<input
+								type="number"
+								bind:value={buyIn}
+								{min}
+								max={table.startingStack}
+								step="1"
+								class="px-field w-full px-3 py-2 text-lg tabular-nums"
+							/>
+							<input
+								type="range"
+								bind:value={buyIn}
+								{min}
+								max={table.startingStack}
+								step="1"
+								class="h-8 w-full accent-gold"
+								aria-label={m.table_buy_in_title()}
+							/>
+
+							<span class="text-xs text-muted">
+								{m.table_buy_in_range({ min, max: table.startingStack })}
+							</span>
+
+							<div class="grid grid-cols-2 gap-2">
+								<button
+									type="button"
+									onclick={() => (pendingSeat = null)}
+									class="px-btn py-2 text-sm font-bold"
+								>
+									{m.table_cancel()}
+								</button>
+								<button
+									type="button"
+									disabled={buyIn < min || buyIn > table.startingStack}
+									onclick={confirmSeat}
+									class="px-btn px-btn-primary py-2 text-sm font-bold"
+								>
+									{m.table_buy_in_confirm()}
+								</button>
+							</div>
+						</div>
+					{/if}
+
 					{#each Array.from({ length: table.maxSeats }, (_, i) => i) as index (index)}
 						{@const seat = seatAt(index)}
 						{@const position = positionFor(index, table.maxSeats)}
@@ -229,7 +298,7 @@
 								clock={table.toAct === index && msLeft !== null
 									? Math.min(1, msLeft / (table.turnSeconds * 1000))
 									: null}
-								onsit={(seatIndex) => send({ type: 'sit', seat: seatIndex })}
+								onsit={chooseSeat}
 							/>
 						</div>
 					{/each}
@@ -321,7 +390,9 @@
 						</a>
 					{/if}
 
-					{#if isHost && table.status === 'running'}
+					<!-- Also offered before the first hand: a game that never started still
+					     needs a way to be closed, or it sits in the lobby forever. -->
+					{#if isHost && table.status !== 'ended'}
 						<button
 							type="button"
 							onclick={() => send({ type: 'end_session' })}

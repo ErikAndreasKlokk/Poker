@@ -8,7 +8,8 @@ export type { Action, LegalActions, Street, Card };
 // --- Client -> server -----------------------------------------------------
 
 export type ClientMessage =
-	| { type: 'sit'; seat: number }
+	/** `buyIn` is in chips; omitted means a full stack. */
+	| { type: 'sit'; seat: number; buyIn?: number }
 	| { type: 'leave' }
 	| { type: 'start' }
 	| { type: 'rebuy' }
