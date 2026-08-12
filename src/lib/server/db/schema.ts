@@ -44,13 +44,13 @@ export const handEventType = pgEnum('hand_event_type', [
 export const user = pgTable('user', {
 	id: text('id').primaryKey(),
 	username: text('username').notNull().unique(),
-	/** E.164, e.g. +4790000000. Verified automatically when signup came via Vipps. */
+	/**
+	 * E.164, e.g. +4790000000. Collected at signup and never verified: Vipps Login
+	 * would have verified it for free, but its API requires a business org number.
+	 * Used to identify who to send money to when settling up after a session.
+	 */
 	phone: text('phone').notNull().unique(),
-	phoneVerified: boolean('phone_verified').notNull().default(false),
-	/** OIDC `sub` from Vipps Login. Null for password-only accounts. */
-	vippsSub: text('vipps_sub').unique(),
-	/** Null when the account is Vipps-only and has never set a fallback password. */
-	passwordHash: text('password_hash'),
+	passwordHash: text('password_hash').notNull(),
 	avatarPath: text('avatar_path'),
 	locale: text('locale').notNull().default('nb'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
