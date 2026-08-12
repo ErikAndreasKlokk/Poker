@@ -15,7 +15,7 @@
 <div class="flex min-h-dvh flex-col">
 	{@render children()}
 
-	<footer class="mx-auto flex w-full max-w-md justify-end px-5 pt-2 pb-6">
+	<footer class="mx-auto flex w-full max-w-6xl justify-end px-5 pt-2 pb-6 lg:px-6">
 		<LanguageSwitcher />
 	</footer>
 </div>

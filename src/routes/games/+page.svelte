@@ -29,9 +29,9 @@
 
 <svelte:head><title>{m.lobby_title()} · {m.app_name()}</title></svelte:head>
 
-<main class="mx-auto flex w-full max-w-md flex-col gap-6 p-5 pb-16">
+<main class="mx-auto flex w-full max-w-5xl flex-col gap-8 p-5 pb-16 lg:p-6">
 	<header class="flex items-center justify-between pt-2">
-		<h1 class="text-2xl font-semibold tracking-tight">{m.lobby_title()}</h1>
+		<h1 class="font-arcade text-xl text-gold lg:text-2xl">{m.lobby_title()}</h1>
 		<a href={resolve('/')} class="text-sm text-muted underline underline-offset-4">
 			{m.app_name()}
 		</a>
@@ -44,7 +44,7 @@
 	{/if}
 
 	<section class="flex flex-col gap-3">
-		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_join_title()}</h2>
+		<h2 class="font-arcade text-xs text-muted">{m.lobby_join_title()}</h2>
 		<form method="POST" action="?/join" class="flex gap-2" use:enhance>
 			<input
 				name="code"
@@ -60,7 +60,7 @@
 	</section>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_open_games()}</h2>
+		<h2 class="font-arcade text-xs text-muted">{m.lobby_open_games()}</h2>
 
 		{#if data.games.length === 0}
 			<p class="text-muted">{m.lobby_no_games()}</p>
@@ -99,12 +99,12 @@
 	</section>
 
 	<section class="flex flex-col gap-3">
-		<h2 class="font-arcade text-[0.6rem] text-muted">{m.lobby_new_game()}</h2>
+		<h2 class="font-arcade text-xs text-muted">{m.lobby_new_game()}</h2>
 
 		<form
 			method="POST"
 			action="?/create"
-			class="flex flex-col gap-4"
+			class="grid gap-4 md:grid-cols-2"
 			use:enhance={() => {
 				creating = true;
 				return async ({ update }) => {
@@ -113,12 +113,12 @@
 				};
 			}}
 		>
-			<label class="flex flex-col gap-1.5">
+			<label class="flex flex-col gap-1.5 md:col-span-2">
 				<span class="text-sm font-medium">{m.game_name()}</span>
 				<input name="name" required maxlength="60" class={field} />
 			</label>
 
-			<fieldset class="flex flex-col gap-2">
+			<fieldset class="flex flex-col gap-2 md:col-span-2">
 				<legend class="text-sm font-medium">{m.game_money_mode()}</legend>
 				<div class="grid grid-cols-2 gap-2">
 					<label class="px-field flex items-center gap-2 px-3 py-3">
@@ -146,7 +146,7 @@
 				</label>
 			{/if}
 
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-2 gap-3 md:col-span-2 md:grid-cols-4">
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm font-medium">{m.game_small_blind()}</span>
 					<input name="smallBlind" type="number" value="10" min="1" required class={field} />
@@ -178,7 +178,7 @@
 				/>
 			</label>
 
-			<label class="flex flex-col gap-1.5">
+			<label class="flex flex-col gap-1.5 md:col-span-2">
 				<span class="text-sm font-medium">
 					{m.game_voice_url()}
 					<span class="font-normal text-muted">({m.auth_optional()})</span>
@@ -187,7 +187,11 @@
 				<span class="text-xs text-muted">{m.game_voice_hint()}</span>
 			</label>
 
-			<button type="submit" disabled={creating} class="px-btn px-btn-primary px-4 py-4 font-bold">
+			<button
+				type="submit"
+				disabled={creating}
+				class="px-btn px-btn-primary px-4 py-4 font-bold md:col-span-2"
+			>
 				{m.game_create_submit()}
 			</button>
 		</form>

@@ -25,7 +25,7 @@
 		{ body: '#ffc94a', edge: '#a37613', mark: '#fff0c2' }
 	];
 
-	const SIZES = { xs: 8, sm: 11, md: 14 } as const;
+	const SIZES = { xs: 11, sm: 15, md: 20 } as const;
 
 	const columns = $derived(drawablePile(breakdown(amount, denominations), maxPerColumn));
 	const px = $derived(SIZES[size]);
@@ -43,7 +43,7 @@
 			>
 				{#if column.count > column.drawn}
 					<!-- The pile is capped for space, so say how many there really are. -->
-					<span class="mt-0.5 text-[0.55rem] leading-none text-muted tabular-nums"
+					<span class="mt-0.5 text-[0.7rem] leading-none text-muted tabular-nums"
 						>×{column.count}</span
 					>
 				{/if}
@@ -79,7 +79,7 @@
 		{/each}
 
 		{#if showTotal}
-			<span class="ml-0.5 text-[0.7rem] leading-none font-semibold tabular-nums">{amount}</span>
+			<span class="ml-1 text-sm leading-none font-bold tabular-nums">{amount}</span>
 		{/if}
 	</span>
 {/if}

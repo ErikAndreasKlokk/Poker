@@ -18,10 +18,11 @@
 	const isRed = $derived(suit === 'h' || suit === 'd');
 
 	// Square corners and hard shadows: no border radius anywhere in the deck.
+	// Sized for a desktop screen — the earlier sizes were unreadable past arm's length.
 	const sizeClasses = {
-		sm: 'h-9 w-6.5 text-[0.5rem]',
-		md: 'h-14 w-10 text-[0.7rem]',
-		lg: 'h-20 w-14 text-base'
+		sm: 'h-12 w-9 text-xs',
+		md: 'h-[4.5rem] w-[3.25rem] text-lg',
+		lg: 'h-[6.5rem] w-[4.75rem] text-2xl'
 	} as const;
 </script>
 

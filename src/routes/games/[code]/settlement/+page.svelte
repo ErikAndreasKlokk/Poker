@@ -12,7 +12,7 @@
 
 <svelte:head><title>{m.settle_title()} · {data.name}</title></svelte:head>
 
-<main class="mx-auto flex w-full max-w-md flex-col gap-6 p-5 pb-16">
+<main class="mx-auto flex w-full max-w-3xl flex-col gap-6 p-5 pb-16">
 	<header class="flex items-start justify-between gap-3 pt-2">
 		<div class="min-w-0">
 			<h1 class="truncate text-2xl font-semibold tracking-tight">{m.settle_title()}</h1>
@@ -55,7 +55,7 @@
 		</section>
 
 		<section class="flex flex-col gap-3">
-			<h2 class="font-arcade text-[0.6rem] text-muted">{m.settle_withdrawals()}</h2>
+			<h2 class="font-arcade text-xs text-muted">{m.settle_withdrawals()}</h2>
 
 			{#if !data.ended}
 				<p class="text-sm text-muted">{m.settle_pending()}</p>
@@ -77,7 +77,7 @@
 		</section>
 
 		<section class="flex flex-col gap-3">
-			<h2 class="font-arcade text-[0.6rem] text-muted">{m.settle_summary()}</h2>
+			<h2 class="font-arcade text-xs text-muted">{m.settle_summary()}</h2>
 			<ul class="flex flex-col divide-y-2 divide-edge">
 				{#each data.lines as line (line.userId)}
 					<li class="flex items-center justify-between gap-3 py-3">

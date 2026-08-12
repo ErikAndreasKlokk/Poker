@@ -10,7 +10,7 @@
 
 <svelte:head><title>{m.hands_title()} · {data.name}</title></svelte:head>
 
-<main class="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-16">
+<main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-5 pb-16">
 	<header class="flex items-start justify-between gap-3 pt-2">
 		<div class="min-w-0">
 			<h1 class="truncate text-2xl font-semibold tracking-tight">{m.hands_title()}</h1>
