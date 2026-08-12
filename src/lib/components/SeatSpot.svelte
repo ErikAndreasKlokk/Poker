@@ -46,11 +46,12 @@
 	</div>
 {/snippet}
 
-<div class="flex w-32 flex-col items-center gap-1">
+<div class="flex w-36 flex-col items-center">
 	{#if seat}
 		{#if betsAbove}{@render wager(seat)}{/if}
 
-		<div class="flex h-12 items-end gap-1">
+		<!-- Cards tuck in behind the plate, so only their tops need vertical room. -->
+		<div class="-mb-3 flex h-12 items-end gap-1">
 			{#if seat.hole}
 				{#each seat.hole as card (card)}
 					<PlayingCard {card} size="sm" />
@@ -62,8 +63,13 @@
 			{/if}
 		</div>
 
+		<!--
+			Laid out sideways: avatar beside the name and stack rather than above
+			them, with the clock on the bottom edge instead of taking its own row.
+			Stacking all four made the plate twice as tall as it needed to be.
+		-->
 		<div
-			class="relative flex w-full flex-col items-center border-2 px-2 py-1.5 transition
+			class="relative z-10 flex w-full items-center gap-2 border-2 px-2 py-1.5 transition
 				{isActing ? 'border-gold bg-surface-hi shadow-[0_0_0_3px_#ffc94a55]' : 'border-edge bg-surface'}
 				{seat.folded ? 'opacity-40' : ''}"
 		>
@@ -79,17 +85,16 @@
 			<img
 				src="/avatar/{seat.userId}"
 				alt=""
-				class="size-9 border-2 object-cover {isYou ? 'border-gold' : 'border-edge-hi'}"
+				class="size-10 shrink-0 border-2 object-cover {isYou ? 'border-gold' : 'border-edge-hi'}"
 			/>
-			<span class="mt-1 w-full truncate text-center text-sm leading-tight font-bold">
-				{seat.username}
+
+			<span class="flex min-w-0 flex-1 flex-col items-start">
+				<span class="w-full truncate text-sm leading-tight font-bold">{seat.username}</span>
+				<ChipStack amount={seat.stack} {denominations} size="xs" maxPerColumn={3} />
 			</span>
 
-			<!-- The stack itself, as chips: colour carries the denomination. -->
-			<ChipStack amount={seat.stack} {denominations} size="xs" maxPerColumn={3} />
-
 			{#if clock !== null}
-				<span class="mt-1.5 h-1.5 w-full bg-ink">
+				<span class="absolute inset-x-0 bottom-0 h-1 bg-ink">
 					<span
 						class="block h-full transition-[width] duration-200 ease-linear
 							{clock < 0.25 ? 'bg-danger' : 'bg-gold'}"
@@ -115,7 +120,6 @@
 			{/if}
 		</div>
 	{:else}
-		<div class="h-12"></div>
 		<button
 			type="button"
 			disabled={!canSit}
@@ -124,6 +128,5 @@
 		>
 			{canSit ? m.table_sit_here() : m.table_empty_seat()}
 		</button>
-		<div class="min-h-6"></div>
 	{/if}
 </div>

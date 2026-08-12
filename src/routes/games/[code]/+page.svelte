@@ -333,7 +333,10 @@
 					<ul class="flex h-40 flex-col gap-1 overflow-y-auto text-sm lg:h-64" aria-live="polite">
 						{#each chat as message (message.id)}
 							<li class="break-words">
-								<span class="font-bold text-gold">{message.username}</span>
+								<!-- Reactions read better without a colon: "erik 👍", not "erik: 👍". -->
+								<span class="font-bold text-gold"
+									>{message.username}{message.kind === 'reaction' ? '' : ':'}</span
+								>
 								{#if message.kind === 'reaction'}
 									<span class="text-xl leading-none">{message.body}</span>
 								{:else}
