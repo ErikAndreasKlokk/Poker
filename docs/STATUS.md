@@ -1,7 +1,7 @@
 # Status
 
-Current as of 2026-08-13, after the bug-fix pass below (not yet committed). Read
-alongside `../CLAUDE.md`, which covers architecture and conventions.
+Current as of 2026-08-13, at commit `2e04f6d`. Read alongside `../CLAUDE.md`,
+which covers architecture and conventions.
 
 **168 unit tests and 71 smoke checks pass. Type-check and lint are clean.**
 
@@ -22,7 +22,7 @@ alongside `../CLAUDE.md`, which covers architecture and conventions.
 | i18n             | `3f7704a`                               | language switcher, translated errors, catalogue parity test        |
 | Pixel redesign   | `2391b7d` `c6cdc60`                     | arcade look, real chips, desktop-first layout                      |
 | Fixes            | `056e311` `670ef9b` `d889f38` `2682f80` | see git log                                                        |
-| Bug-fix pass     | uncommitted                             | the six bugs below, plus 28 new smoke checks                       |
+| Bug-fix pass     | `2e04f6d`                               | the six bugs below, plus 28 new smoke checks                       |
 
 ### Decisions worth not relitigating
 

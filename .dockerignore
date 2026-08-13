@@ -1,0 +1,16 @@
+# `COPY . .` runs after `npm ci`, so a host node_modules would clobber the
+# install. CI checks out clean, but a local `docker build` would not.
+node_modules
+build
+build-server
+.svelte-kit
+
+.git
+.github
+.vscode
+docs
+scripts
+
+.env
+.env.*
+!.env.example
