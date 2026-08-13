@@ -10,11 +10,11 @@
  *   docker run -d --name poker-pg -e POSTGRES_PASSWORD=postgres \
  *     -e POSTGRES_USER=postgres -e POSTGRES_DB=poker -p 5432:5432 postgres:17-alpine
  *   npx drizzle-kit push --force
- *   psql -c "insert into invite (code) values ('FRIEND1'), ('FRIEND2')"
+ *   psql -c "insert into invite (code) values ('FRIEND1'), ('FRIEND2'), ('FRIEND3')"
  *   npm run dev
  *   node scripts/smoke.mjs
  *
- * Expects an empty user table and unused invites named FRIEND1 and FRIEND2.
+ * Expects an empty user table and unused invites FRIEND1, FRIEND2 and FRIEND3.
  *
  * The last section runs on a 10-second action clock and deliberately waits for
  * it to expire twice, so the whole run takes a couple of minutes.
@@ -694,6 +694,124 @@ check(
 );
 checking.host.socket.close();
 checking.guest.socket.close();
+
+// --- Leaderboards ---------------------------------------------------------
+
+// Someone who has never sat down. The boards are supposed to list everyone, so
+// this account exists purely to be on them at zero.
+const spectator = new Session();
+res = await spectator.post('/auth?/register', {
+	username: `watcher${stamp}`,
+	phone: `9${stamp}5`.slice(0, 8),
+	password: 'hunter2hunter2',
+	invite: 'FRIEND3'
+});
+check('a player who never plays can register', res.status === 303, `status ${res.status}`);
+
+// A play-money session, played to the end, so there is something to rank.
+//
+// The hand is decided by a preflop fold rather than an all-in: heads-up the
+// button posts the small blind and folding hands it over, which moves exactly
+// one small blind. Shoving instead would usually work, but a chopped pot moves
+// nothing and the run would fail for a legitimate outcome.
+res = await erik.post('/games?/create', {
+	name: 'Play night',
+	realMoney: 'false',
+	smallBlind: '30',
+	bigBlind: '60',
+	startingStack: '1000',
+	maxSeats: '6',
+	turnSeconds: '10'
+});
+const playCode = (res.headers.get('location') ?? '').split('/').pop() ?? '';
+
+const p1 = new Client(playCode, erik.cookie, 'erik-play');
+const p2 = new Client(playCode, ola.cookie, 'ola-play');
+await Promise.all([p1.ready, p2.ready]);
+
+p1.send({ type: 'sit', seat: 0 });
+await p1.state((t) => t.seats.length === 1, 'play seat 1');
+p2.send({ type: 'sit', seat: 1 });
+await Promise.all([
+	p1.state((t) => t.seats.length === 2, 'play seats'),
+	p2.state((t) => t.seats.length === 2, 'play seats')
+]);
+
+p1.send({ type: 'start' });
+await Promise.all([
+	p1.state((t) => t.handNumber !== null, 'play dealt'),
+	p2.state((t) => t.handNumber !== null, 'play dealt')
+]);
+
+const playActor = [p1, p2].find((client) => client.table.legal);
+playActor.send({ type: 'act', action: { type: 'fold' } });
+await p1.state((t) => t.seats.some((s) => s.won > 0), 'play settled');
+
+const playStacks = p1.table.seats.map((s) => s.stack);
+const swing = Math.max(...playStacks) - 1000;
+check('folding the small blind moves exactly that', swing === 30, `swing ${swing}`);
+
+check('the play session can be closed', await endSession(p1));
+p1.socket.close();
+p2.socket.close();
+
+res = await erik.get('/leaderboard?mode=play');
+const playBoard = await res.text();
+check('the play-money board renders', res.status === 200, `status ${res.status}`);
+// Chips are conserved, so the two figures are equal and opposite.
+check('the play board shows what was won', playBoard.includes(`+${swing}`), `+${swing}`);
+check('the play board shows what was lost', playBoard.includes(`-${swing}`), `-${swing}`);
+
+res = await erik.get('/leaderboard?mode=money');
+const moneyBoard = await res.text();
+check('the real-money board renders', res.status === 200, `status ${res.status}`);
+
+// The big blind in "Cash out night" cashed out for 480 of a 500 kr buy-in and
+// has played no other settled real-money session, so they are exactly 20 down.
+check(
+	'the money board prices a session from the ledger',
+	moneyBoard.includes('-20,00 kr'),
+	'-20,00 kr'
+);
+
+// The point of the left join: everyone appears, including the account that has
+// never played a hand.
+const watcherName = `watcher${stamp}`;
+check('a player who never played is still listed', playBoard.includes(watcherName), watcherName);
+check('and is listed on the money board too', moneyBoard.includes(watcherName), watcherName);
+
+res = await erik.get('/leaderboard?mode=money&page=99');
+check(
+	'a page past the end is clamped rather than empty',
+	res.status === 200,
+	`status ${res.status}`
+);
+check('the clamped page still lists players', (await res.text()).includes(watcherName));
+
+res = await new Session().get('/leaderboard');
+check('the leaderboard is not public', res.status === 302, `status ${res.status}`);
+
+// --- Profile --------------------------------------------------------------
+
+res = await spectator.post('/profile?/username', { username: `renamed${stamp}` });
+check('a player can change their username', res.status === 200, `status ${res.status}`);
+
+res = await erik.get('/leaderboard?mode=play');
+const renamedBoard = await res.text();
+check(
+	'the new name shows everywhere at once',
+	renamedBoard.includes(`renamed${stamp}`) && !renamedBoard.includes(watcherName),
+	'renamed on the board'
+);
+
+res = await spectator.post('/profile?/username', { username: `erik${stamp}` });
+check('a username already in use is refused', res.status === 400, `status ${res.status}`);
+
+res = await spectator.post('/profile?/username', { username: 'no' });
+check('too short a username is refused', res.status === 400, `status ${res.status}`);
+
+res = await new Session().get('/profile');
+check('the profile page is not public', res.status === 302, `status ${res.status}`);
 
 log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

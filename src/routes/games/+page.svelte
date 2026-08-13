@@ -35,13 +35,20 @@
 		<h1 class="font-arcade text-xl text-gold lg:text-2xl">{m.lobby_title()}</h1>
 
 		{#if data.user}
-			<div class="flex items-center gap-3">
-				<img
-					src="/avatar/{data.user.id}"
-					alt=""
-					class="size-9 border-2 border-edge-hi object-cover"
-				/>
-				<span class="text-sm font-bold">{data.user.username}</span>
+			<!-- Wraps rather than squeezing: four controls plus a name do not fit on
+			     one line at every window width. -->
+			<div class="flex flex-wrap items-center justify-end gap-2">
+				<a href={resolve('/profile')} class="flex items-center gap-2" title={m.profile_title()}>
+					<img
+						src="/avatar/{data.user.id}"
+						alt=""
+						class="size-9 border-2 border-edge-hi object-cover"
+					/>
+					<span class="text-sm font-bold">{data.user.username}</span>
+				</a>
+				<a href={resolve('/leaderboard')} class="px-btn px-3 py-2 text-sm font-bold">
+					{m.leaderboard_title()}
+				</a>
 				<a href={resolve('/invites')} class="px-btn px-3 py-2 text-sm font-bold">
 					{m.invites_title()}
 				</a>

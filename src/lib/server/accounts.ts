@@ -1,5 +1,5 @@
 import { hash, verify } from '@node-rs/argon2';
-import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
@@ -116,6 +116,31 @@ export async function verifyCredentials(
 	if (!ok) throw new AccountProblem('invalid_credentials');
 
 	return { id: existing.id, locale: existing.locale };
+}
+
+// --- Profile --------------------------------------------------------------
+
+/**
+ * Renames an account.
+ *
+ * Nothing stores a username as data — chat, hand history and the settlement all
+ * join it live — so a rename shows up everywhere at once. The exception is a
+ * table already in memory, which keeps the old name until the room is reloaded.
+ */
+export async function changeUsername(userId: string, raw: string): Promise<string> {
+	const username = validateUsername(raw);
+
+	// Excludes the account itself, so re-submitting an unchanged name is a no-op
+	// rather than a collision with itself.
+	const [taken] = await db
+		.select({ id: table.user.id })
+		.from(table.user)
+		.where(and(eq(table.user.username, username), ne(table.user.id, userId)));
+
+	if (taken) throw new AccountProblem('username_taken');
+
+	await db.update(table.user).set({ username }).where(eq(table.user.id, userId));
+	return username;
 }
 
 // --- Avatars --------------------------------------------------------------

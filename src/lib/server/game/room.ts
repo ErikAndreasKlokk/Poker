@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import * as schema from '../db/schema';
 import type { Action } from '../../poker/engine';
@@ -183,7 +183,8 @@ export class GameRoom {
 				gameId: this.game.id,
 				userId,
 				seat,
-				stack
+				stack,
+				buyInChips: stack
 			});
 
 			// A buy-in is real money leaving someone's pocket — record it immediately
@@ -274,7 +275,13 @@ export class GameRoom {
 		await this.db.transaction(async (tx) => {
 			await tx
 				.update(schema.gamePlayer)
-				.set({ stack: player.stack, status: 'active' })
+				.set({
+					stack: player.stack,
+					status: 'active',
+					// Incremented in SQL rather than from a number held here, so a
+					// rebuy can never lose a concurrent update to the same row.
+					buyInChips: sql`${schema.gamePlayer.buyInChips} + ${topUp}`
+				})
 				.where(this.activeSeatOf(userId));
 
 			if (this.game.realMoney) {

@@ -3,31 +3,41 @@
 Current as of 2026-08-13, deployed and playable. Read alongside `../CLAUDE.md`,
 which covers architecture and conventions.
 
-**173 unit tests and 71 smoke checks pass. Type-check and lint are clean.**
+**184 unit tests and 89 smoke checks pass. Type-check and lint are clean.**
 
 ---
 
 ## Built
 
-| Area              | Commits                                 | Notes                                                                 |
-| ----------------- | --------------------------------------- | --------------------------------------------------------------------- |
-| Scaffold          | `c28a674`                               | SvelteKit 5, Tailwind v4, Drizzle, Paraglide (nb/en), adapter-node    |
-| Schema            | `179c123`                               | users, invites, games, seats, hands, hand events, chat, ledger        |
-| Poker engine      | `81ac87e`                               | NLHE: crypto shuffle, blinds, min-raise, side pots, showdown          |
-| Auth              | `1d982d7` `85a1ea4` `5558118`           | invite-only, session cookie + Argon2, avatars in Postgres             |
-| Realtime + lobby  | `bbc62bc` `dcd9273`                     | WebSocket rooms, game creation, join by code                          |
-| Table UI          | `b38cc88` `e53b170`                     | felt, seats, action clock, bet presets                                |
-| Settle-up         | `5109b88` `826a0a7` `548e7a7`           | ledger, Boks fee, withdrawal list                                     |
-| History + replay  | `a41ae6c`                               | scrubbable replay from the event log, chat, reactions                 |
-| i18n              | `3f7704a`                               | language switcher, translated errors, catalogue parity test           |
-| Pixel redesign    | `2391b7d` `c6cdc60`                     | arcade look, real chips, desktop-first layout                         |
-| Fixes             | `056e311` `670ef9b` `d889f38` `2682f80` | see git log                                                           |
-| Bug-fix pass      | `2e04f6d`                               | the six bugs below, plus 28 new smoke checks                          |
-| Homelab deploy    | `0ac220c`                               | Dockerfiles, CI, and `homelab/applications/poker/`                    |
-| Invites in the UI | uncommitted                             | `/invites`: anyone signed in can mint a code, list shows who spent it |
+| Area                   | Commits                                 | Notes                                                                 |
+| ---------------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| Scaffold               | `c28a674`                               | SvelteKit 5, Tailwind v4, Drizzle, Paraglide (nb/en), adapter-node    |
+| Schema                 | `179c123`                               | users, invites, games, seats, hands, hand events, chat, ledger        |
+| Poker engine           | `81ac87e`                               | NLHE: crypto shuffle, blinds, min-raise, side pots, showdown          |
+| Auth                   | `1d982d7` `85a1ea4` `5558118`           | invite-only, session cookie + Argon2, avatars in Postgres             |
+| Realtime + lobby       | `bbc62bc` `dcd9273`                     | WebSocket rooms, game creation, join by code                          |
+| Table UI               | `b38cc88` `e53b170`                     | felt, seats, action clock, bet presets                                |
+| Settle-up              | `5109b88` `826a0a7` `548e7a7`           | ledger, Boks fee, withdrawal list                                     |
+| History + replay       | `a41ae6c`                               | scrubbable replay from the event log, chat, reactions                 |
+| i18n                   | `3f7704a`                               | language switcher, translated errors, catalogue parity test           |
+| Pixel redesign         | `2391b7d` `c6cdc60`                     | arcade look, real chips, desktop-first layout                         |
+| Fixes                  | `056e311` `670ef9b` `d889f38` `2682f80` | see git log                                                           |
+| Bug-fix pass           | `2e04f6d`                               | the six bugs below, plus 28 new smoke checks                          |
+| Homelab deploy         | `0ac220c`                               | Dockerfiles, CI, and `homelab/applications/poker/`                    |
+| Invites in the UI      | `836937c`                               | `/invites`: anyone signed in can mint a code, list shows who spent it |
+| Leaderboards + profile | uncommitted                             | `/leaderboard` (two boards, paginated) and `/profile` (name, picture) |
 
 ### Decisions worth not relitigating
 
+- **Leaderboards count only settled sessions.** A buy-in is recorded when a
+  player sits down but the cash-out only when the night ends, so counting a
+  running game would show everyone as having lost their whole buy-in.
+- **Two boards, never combined.** Real money ranks by net øre read from the
+  ledger, so it is net of the Vipps fee; play money ranks by net chips, which
+  are not comparable across stakes but are comparable across this friend group.
+- **Play-money results need `game_player.buy_in_chips`.** `stack` is overwritten
+  after every hand, so without that column there is no record of what anyone
+  sat down with. Real money gets the same answer from the ledger.
 - **No Vipps API.** Credentials require a registered business. The Boks code is
   display-only; the app can never verify a payment.
 - **One chip is one krone** for real-money games. The buy-in is the stack.

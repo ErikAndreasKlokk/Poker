@@ -145,6 +145,16 @@ export const gamePlayer = pgTable(
 		seat: integer('seat').notNull(),
 		/** Current chip stack. Authoritative copy lives in memory during a hand. */
 		stack: integer('stack').notNull().default(0),
+		/**
+		 * Chips this player has put on the table across this stint — the initial
+		 * buy-in plus every rebuy.
+		 *
+		 * Without it a play-money result cannot be reconstructed: `stack` is
+		 * overwritten after every hand, so by the end of a session nothing records
+		 * what the player started with. Real-money games get the same answer from
+		 * the ledger, but play-money games write no ledger rows at all.
+		 */
+		buyInChips: integer('buy_in_chips').notNull().default(0),
 		status: seatStatus('status').notNull().default('active'),
 		joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
 		leftAt: timestamp('left_at', { withTimezone: true })
