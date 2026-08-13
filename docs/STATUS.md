@@ -1,28 +1,30 @@
 # Status
 
-Current as of 2026-08-13, at commit `2e04f6d`. Read alongside `../CLAUDE.md`,
+Current as of 2026-08-13, deployed and playable. Read alongside `../CLAUDE.md`,
 which covers architecture and conventions.
 
-**168 unit tests and 71 smoke checks pass. Type-check and lint are clean.**
+**173 unit tests and 71 smoke checks pass. Type-check and lint are clean.**
 
 ---
 
 ## Built
 
-| Area             | Commits                                 | Notes                                                              |
-| ---------------- | --------------------------------------- | ------------------------------------------------------------------ |
-| Scaffold         | `c28a674`                               | SvelteKit 5, Tailwind v4, Drizzle, Paraglide (nb/en), adapter-node |
-| Schema           | `179c123`                               | users, invites, games, seats, hands, hand events, chat, ledger     |
-| Poker engine     | `81ac87e`                               | NLHE: crypto shuffle, blinds, min-raise, side pots, showdown       |
-| Auth             | `1d982d7` `85a1ea4` `5558118`           | invite-only, session cookie + Argon2, avatars in Postgres          |
-| Realtime + lobby | `bbc62bc` `dcd9273`                     | WebSocket rooms, game creation, join by code                       |
-| Table UI         | `b38cc88` `e53b170`                     | felt, seats, action clock, bet presets                             |
-| Settle-up        | `5109b88` `826a0a7` `548e7a7`           | ledger, Boks fee, withdrawal list                                  |
-| History + replay | `a41ae6c`                               | scrubbable replay from the event log, chat, reactions              |
-| i18n             | `3f7704a`                               | language switcher, translated errors, catalogue parity test        |
-| Pixel redesign   | `2391b7d` `c6cdc60`                     | arcade look, real chips, desktop-first layout                      |
-| Fixes            | `056e311` `670ef9b` `d889f38` `2682f80` | see git log                                                        |
-| Bug-fix pass     | `2e04f6d`                               | the six bugs below, plus 28 new smoke checks                       |
+| Area              | Commits                                 | Notes                                                                 |
+| ----------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| Scaffold          | `c28a674`                               | SvelteKit 5, Tailwind v4, Drizzle, Paraglide (nb/en), adapter-node    |
+| Schema            | `179c123`                               | users, invites, games, seats, hands, hand events, chat, ledger        |
+| Poker engine      | `81ac87e`                               | NLHE: crypto shuffle, blinds, min-raise, side pots, showdown          |
+| Auth              | `1d982d7` `85a1ea4` `5558118`           | invite-only, session cookie + Argon2, avatars in Postgres             |
+| Realtime + lobby  | `bbc62bc` `dcd9273`                     | WebSocket rooms, game creation, join by code                          |
+| Table UI          | `b38cc88` `e53b170`                     | felt, seats, action clock, bet presets                                |
+| Settle-up         | `5109b88` `826a0a7` `548e7a7`           | ledger, Boks fee, withdrawal list                                     |
+| History + replay  | `a41ae6c`                               | scrubbable replay from the event log, chat, reactions                 |
+| i18n              | `3f7704a`                               | language switcher, translated errors, catalogue parity test           |
+| Pixel redesign    | `2391b7d` `c6cdc60`                     | arcade look, real chips, desktop-first layout                         |
+| Fixes             | `056e311` `670ef9b` `d889f38` `2682f80` | see git log                                                           |
+| Bug-fix pass      | `2e04f6d`                               | the six bugs below, plus 28 new smoke checks                          |
+| Homelab deploy    | `0ac220c`                               | Dockerfiles, CI, and `homelab/applications/poker/`                    |
+| Invites in the UI | uncommitted                             | `/invites`: anyone signed in can mint a code, list shows who spent it |
 
 ### Decisions worth not relitigating
 
@@ -61,20 +63,32 @@ Added on 2026-08-13, all in `scripts/smoke.mjs`:
 
 ---
 
+## Deployed
+
+Live at **poker.erikak.no**, manifests in `homelab/applications/poker/`. Use the
+`new-homelab-project` skill for anything against the cluster.
+
+- The image runs `server.js`, not `node build`: adapter-node's entry cannot host
+  the WebSocket server, so both bundles ship and `server.js` wires them together.
+- `drizzle-orm` and `postgres` must stay in **dependencies**. The SvelteKit
+  bundle inlines them, but the socket bundle is built `--packages=external` and
+  imports both at runtime, so `npm prune --production` would delete them.
+- **One replica, `Recreate` strategy**, because live hand state is in memory.
+- The HTTPRoute gives `/ws/game` its own rule with timeouts disabled. Envoy
+  passes an HTTP/1.1 Upgrade through a normal route, but the default backend
+  timeout would cut an idle table's socket.
+- Secrets: `poker-postgresql-secret` and `poker-bootstrap-secret`, both sealed.
+  `ORIGIN` is a plain env var and must be set, or SvelteKit rejects form posts.
+- **A push to `main` does not redeploy.** The `:main` tag is reused, so ArgoCD
+  sees no diff — run `kubectl rollout restart deployment/poker -n poker` once CI
+  has built the image. Schema changes re-apply on their own via the migrate Job.
+- The GHCR packages (`poker`, `poker-migrate`) must be **public**, or the
+  cluster gets a 401 pulling them. Package visibility is separate from repo
+  visibility and is a UI-only setting.
+
 ## Remaining work
 
-### Homelab deploy — the only unstarted item
-
-Use the `new-homelab-project` skill. Needs more than the usual template:
-
-- `Dockerfile` must run `server.js`, not `node build`, and produce **both**
-  bundles (`npm run build` does both).
-- `Dockerfile.migrate` running `drizzle-kit push --force`.
-- Ingress must allow **WebSocket upgrades** on `/ws/game/*`.
-- **One replica, `Recreate` strategy.** Two pods would split the tables, and a
-  rolling update would run two at once.
-- Secrets: `DATABASE_URL`, `ORIGIN`, `BOOTSTRAP_INVITE_CODE`.
-- `ORIGIN` must be set or SvelteKit rejects form posts behind the ingress.
+Nothing blocking. See the nice-to-haves below.
 
 ---
 
@@ -129,4 +143,3 @@ None known. The six that were open were fixed on 2026-08-13.
 - Push notifications for "it's your turn" (deferred from v1).
 - Resuming an interrupted hand from the event log rather than voiding it.
 - A profile page to change avatar or password after signup.
-- Invite management in the UI — codes are inserted by hand in SQL today.

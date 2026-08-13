@@ -159,7 +159,16 @@
 
 			<label class="flex flex-col gap-1.5">
 				<span class="text-sm font-medium">{m.auth_invite()}</span>
-				<input name="invite" required class="px-field px-3 py-3 text-base" />
+				<!-- Codes are lowercase and compared exactly, and a phone keyboard would
+			     otherwise capitalise the first letter of one that was typed in. -->
+				<input
+					name="invite"
+					required
+					autocapitalize="off"
+					autocorrect="off"
+					spellcheck="false"
+					class="px-field px-3 py-3 text-base"
+				/>
 				<span class="text-xs text-muted">{m.auth_invite_hint()}</span>
 			</label>
 

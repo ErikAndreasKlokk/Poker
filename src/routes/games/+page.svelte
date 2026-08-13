@@ -42,6 +42,9 @@
 					class="size-9 border-2 border-edge-hi object-cover"
 				/>
 				<span class="text-sm font-bold">{data.user.username}</span>
+				<a href={resolve('/invites')} class="px-btn px-3 py-2 text-sm font-bold">
+					{m.invites_title()}
+				</a>
 				<form method="POST" action="/logout">
 					<button class="px-btn px-3 py-2 text-sm font-bold">{m.log_out()}</button>
 				</form>
