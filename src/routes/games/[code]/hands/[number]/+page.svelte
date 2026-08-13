@@ -135,7 +135,7 @@
 						{/if}
 					</span>
 
-					<span class="w-12 text-right text-sm tabular-nums">
+					<span class="px-num w-12 text-right text-sm">
 						{frame.committed[seat] ? `+${frame.committed[seat]}` : ''}
 					</span>
 				</li>

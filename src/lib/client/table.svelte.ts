@@ -104,7 +104,8 @@ export class TableConnection {
 					break;
 				case 'chat_history':
 					// Replaces rather than merges: the backlog is authoritative on connect.
-					// Past reactions are moments, not messages, so they are dropped.
+					// The server no longer sends reactions here; the filter is left as a
+					// guard for games recorded before that changed.
 					this.chat = message.messages.filter((entry) => entry.kind !== 'reaction');
 					break;
 				case 'error':

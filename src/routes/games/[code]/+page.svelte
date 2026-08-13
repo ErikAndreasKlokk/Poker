@@ -19,6 +19,14 @@
 	let pendingSeat = $state<number | null>(null);
 	let buyIn = $state(0);
 
+	/**
+	 * Whether the leave button is showing its confirmation.
+	 *
+	 * Cashing out mid-hand folds the hand and cannot be undone, so it takes two
+	 * clicks — the button sits next to the chat, well within misclick range.
+	 */
+	let confirmingLeave = $state(false);
+
 	// Keyed on the code so navigating straight from one table to another tears
 	// down the old socket instead of leaving it open.
 	$effect(() => {
@@ -89,6 +97,20 @@
 		return table?.seats.find((seat) => seat.seat === index);
 	}
 
+	/** Measured width of the felt, which drives how big the middle is drawn. */
+	let feltWidth = $state(0);
+
+	/**
+	 * Board and pot scale with the felt.
+	 *
+	 * The seat ring sits at a fixed 30% of the felt's height above and below the
+	 * middle, and the felt keeps a fixed aspect ratio, so the space between them
+	 * shrinks with the window while a fixed card size does not. At full size a
+	 * river plus a pot label was taller than that gap and ran into the seats.
+	 */
+	const boardSize = $derived(feltWidth >= 880 ? 'lg' : feltWidth >= 620 ? 'md' : 'sm');
+	const potChipSize = $derived(feltWidth >= 880 ? 'md' : 'sm');
+
 	/**
 	 * Rotates the table so the viewer always sits at the bottom, with the next
 	 * seat to act running clockwise from there — the way it looks in person.
@@ -115,6 +137,11 @@
 
 	function act(action: Action) {
 		send({ type: 'act', action });
+	}
+
+	function leaveTable() {
+		confirmingLeave = false;
+		send({ type: 'leave' });
 	}
 
 	/** Opens the buy-in chooser rather than sitting down straight away. */
@@ -173,9 +200,14 @@
 		<div class="grid flex-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
 			<div class="flex min-w-0 flex-col gap-4">
 				<!-- The felt: seats arranged around the rim, board and pot in the middle. -->
-				<section class="px-felt relative aspect-4/5 w-full sm:aspect-7/5">
+				<section
+					bind:clientWidth={feltWidth}
+					class="px-felt relative aspect-4/5 w-full sm:aspect-7/5"
+				>
+					<!-- Held to 60% of the felt so a full board and a side-pot row still
+					     leave the seat ring its own space. -->
 					<div
-						class="absolute top-1/2 left-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 px-2"
+						class="absolute top-1/2 left-1/2 flex max-h-[60%] w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1.5 px-2"
 					>
 						{#if table.handNumber}
 							<span class="font-arcade text-[0.65rem] tracking-widest text-emerald-200/80">
@@ -190,7 +222,7 @@
 						{#if table.board.length > 0}
 							<div class="flex items-center gap-1.5 sm:gap-2">
 								{#each table.board as card (card)}
-									<PlayingCard {card} size="lg" />
+									<PlayingCard {card} size={boardSize} />
 								{/each}
 							</div>
 						{/if}
@@ -201,8 +233,8 @@
 								<ChipStack
 									amount={potAtStake}
 									{denominations}
-									size="md"
-									maxPerColumn={5}
+									size={potChipSize}
+									maxPerColumn={4}
 									showTotal={false}
 								/>
 								<span
@@ -240,7 +272,7 @@
 								{min}
 								max={table.startingStack}
 								step="1"
-								class="px-field w-full px-3 py-2 text-lg tabular-nums"
+								class="px-field px-num w-full px-3 py-2 text-lg"
 							/>
 							<input
 								type="range"
@@ -339,14 +371,6 @@
 						{secondsLeft}
 						onact={act}
 					/>
-				{:else if mySeat !== null && table.status === 'lobby'}
-					<button
-						type="button"
-						onclick={() => send({ type: 'leave' })}
-						class="px-btn py-3 text-sm font-bold"
-					>
-						{m.table_leave()}
-					</button>
 				{/if}
 			</div>
 
@@ -390,6 +414,33 @@
 						</a>
 					{/if}
 
+					<!-- Cashing out lives here rather than beside the action bar, which is
+					     replaced by the betting controls on your turn — that left a running
+					     game with no way out at all. -->
+					{#if mySeat !== null && table.status !== 'ended'}
+						{#if table.you.leaving}
+							<p class="px-panel px-3 py-2 text-center text-sm text-muted">
+								{m.table_cash_out_pending()}
+							</p>
+						{:else if confirmingLeave}
+							<button
+								type="button"
+								onclick={leaveTable}
+								class="px-btn px-3 py-2 text-sm font-bold text-danger"
+							>
+								{table.realMoney ? m.table_cash_out_confirm() : m.table_leave_confirm()}
+							</button>
+						{:else}
+							<button
+								type="button"
+								onclick={() => (confirmingLeave = true)}
+								class="px-btn px-3 py-2 text-sm font-bold"
+							>
+								{table.realMoney ? m.table_cash_out() : m.table_leave()}
+							</button>
+						{/if}
+					{/if}
+
 					<!-- Also offered before the first hand: a game that never started still
 					     needs a way to be closed, or it sits in the lobby forever. -->
 					{#if isHost && table.status !== 'ended'}
@@ -406,16 +457,10 @@
 				<section class="px-panel flex min-h-0 flex-col gap-2 p-3">
 					<ul class="flex h-40 flex-col gap-1 overflow-y-auto text-sm lg:h-64" aria-live="polite">
 						{#each chat as message (message.id)}
+							<!-- Reactions never reach this list: they float over a seat and are gone. -->
 							<li class="break-words">
-								<!-- Reactions read better without a colon: "erik 👍", not "erik: 👍". -->
-								<span class="font-bold text-gold"
-									>{message.username}{message.kind === 'reaction' ? '' : ':'}</span
-								>
-								{#if message.kind === 'reaction'}
-									<span class="text-xl leading-none">{message.body}</span>
-								{:else}
-									<span class="text-parchment">{message.body}</span>
-								{/if}
+								<span class="font-bold text-gold">{message.username}:</span>
+								<span class="text-parchment">{message.body}</span>
 							</li>
 						{/each}
 					</ul>

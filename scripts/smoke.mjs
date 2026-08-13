@@ -10,11 +10,14 @@
  *   docker run -d --name poker-pg -e POSTGRES_PASSWORD=postgres \
  *     -e POSTGRES_USER=postgres -e POSTGRES_DB=poker -p 5432:5432 postgres:17-alpine
  *   npx drizzle-kit push --force
- *   psql -c "insert into invite (code) values ('FRIEND1')"
+ *   psql -c "insert into invite (code) values ('FRIEND1'), ('FRIEND2')"
  *   npm run dev
  *   node scripts/smoke.mjs
  *
- * Expects an empty user table and an unused invite named FRIEND1.
+ * Expects an empty user table and unused invites named FRIEND1 and FRIEND2.
+ *
+ * The last section runs on a 10-second action clock and deliberately waits for
+ * it to expire twice, so the whole run takes a couple of minutes.
  */
 import WebSocket from 'ws';
 
@@ -30,7 +33,9 @@ function check(label, ok, detail = '') {
 setTimeout(() => {
 	log('\nGLOBAL TIMEOUT — run stalled');
 	process.exit(1);
-}, 90_000);
+}, 240_000);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class Session {
 	cookie = '';
@@ -371,6 +376,324 @@ check(
 	olaSelf.hole.every((card) => !shows(card)),
 	olaSelf.hole.join(' ')
 );
+
+// --- Three-handed play, side pots, cashing out and reconnecting -----------
+
+const kari = new Session();
+res = await kari.post('/auth?/register', {
+	username: `kari${stamp}`,
+	phone: `9${stamp}4`.slice(0, 8),
+	password: 'hunter2hunter2',
+	invite: 'FRIEND2'
+});
+check('third player registers', res.status === 303, `status ${res.status}`);
+
+res = await erik.post('/games?/create', {
+	name: 'Three way',
+	realMoney: 'false',
+	smallBlind: '10',
+	bigBlind: '20',
+	startingStack: '1000',
+	maxSeats: '6',
+	turnSeconds: '10'
+});
+const threeCode = (res.headers.get('location') ?? '').split('/').pop() ?? '';
+check('create a three-handed game', res.status === 303 && threeCode.length === 6, threeCode);
+
+const a = new Client(threeCode, erik.cookie, 'erik3');
+const b = new Client(threeCode, ola.cookie, 'ola3');
+const c = new Client(threeCode, kari.cookie, 'kari3');
+const table3 = [a, b, c];
+await Promise.all(table3.map((client) => client.ready));
+
+// Deliberately uneven stacks: three all-ins at these depths must break the pot
+// into a main pot and two side pots.
+a.send({ type: 'sit', seat: 0, buyIn: 1000 });
+await a.state((t) => t.seats.length === 1, 'erik seated');
+b.send({ type: 'sit', seat: 1, buyIn: 300 });
+await b.state((t) => t.seats.length === 2, 'ola seated');
+c.send({ type: 'sit', seat: 2, buyIn: 100 });
+await Promise.all(table3.map((client) => client.state((t) => t.seats.length === 3, 'all seated')));
+check('three players seated at once', a.table.seats.length === 3);
+check(
+	'short buy-ins are honoured',
+	a.table.seats.map((s) => s.stack).sort((x, y) => x - y)[0] === 100,
+	a.table.seats.map((s) => `${s.seat}:${s.stack}`).join(' ')
+);
+
+a.send({ type: 'start' });
+await Promise.all(table3.map((client) => client.state((t) => t.handNumber !== null, 'hand dealt')));
+check(
+	'three-handed hand is dealt',
+	a.table.seats.every((s) => s.cardCount === 2)
+);
+
+/**
+ * Drives a hand to its end with everyone shoving, so short stacks run out.
+ *
+ * Waits for `legal` to clear on the client that just acted rather than for a
+ * matching state message: the client keeps every message it has received, so a
+ * predicate that only asks for "no legal actions" matches a state from before
+ * this seat's turn and returns while the action is still in flight.
+ */
+async function shoveToShowdown(clients, label) {
+	const deadline = Date.now() + 30_000;
+
+	while (Date.now() < deadline) {
+		if (clients[0].table?.seats.some((s) => s.won > 0)) return;
+
+		const actor = clients.find((client) => client.table?.legal);
+		if (!actor) {
+			await sleep(100);
+			continue;
+		}
+
+		const legal = actor.table.legal;
+		actor.send({
+			type: 'act',
+			action: legal.canRaise
+				? { type: 'raise', to: legal.maxRaiseTo }
+				: legal.canCall
+					? { type: 'call' }
+					: { type: 'check' }
+		});
+
+		const acted = Date.now() + 5000;
+		while (actor.table?.legal && Date.now() < acted) await sleep(50);
+	}
+	throw new Error(`${label}: hand never finished`);
+}
+
+await shoveToShowdown(table3, 'three-handed');
+await a.state((t) => t.pots.length > 0, 'pots settled');
+
+check(
+	'an all-in three-way pot produces side pots',
+	a.table.pots.length > 1,
+	`${a.table.pots.length} pot(s)`
+);
+check(
+	'the main pot is limited to the shortest stack',
+	a.table.pots[0].amount === 300,
+	`main pot ${a.table.pots[0].amount}`
+);
+check(
+	'every seat is eligible for the main pot',
+	a.table.pots[0].eligibleSeats.length === 3,
+	a.table.pots[0].eligibleSeats.join(',')
+);
+check(
+	'chips are conserved across a side-pot hand',
+	a.table.seats.reduce((sum, s) => sum + s.stack, 0) === 1400,
+	`${a.table.seats.reduce((sum, s) => sum + s.stack, 0)} of 1400`
+);
+
+// Reconnect mid-hand: a fresh socket on the same session must be dealt back
+// into the hand it left, holding the same cards.
+await a.state((t) => t.handNumber === 2, 'second hand', 15000);
+const beforeDrop = a.table.seats.find((s) => s.seat === 0).hole;
+a.socket.close();
+const rejoined = new Client(threeCode, erik.cookie, 'erik-again');
+await rejoined.ready;
+await rejoined.state((t) => t.handNumber !== null, 'state after reconnect');
+const afterRejoin = rejoined.table.seats.find((s) => s.seat === 0);
+check('a reconnecting player is still in the hand', afterRejoin !== undefined);
+check(
+	'a reconnecting player gets their own cards back',
+	JSON.stringify(afterRejoin.hole) === JSON.stringify(beforeDrop),
+	`${JSON.stringify(beforeDrop)} vs ${JSON.stringify(afterRejoin.hole)}`
+);
+check('reconnecting does not leave the player sitting out', afterRejoin.sittingOut === false);
+
+// Cashing out mid-hand: the seat is held until the hand settles, because the
+// room only learns the real stack at settlement.
+const cashOutSeat = 1;
+const seatsBefore = rejoined.table.seats.length;
+b.send({ type: 'leave' });
+await b.state((t) => t.you.leaving, 'leave acknowledged');
+check('cashing out mid-hand is acknowledged', b.table.you.leaving === true);
+check(
+	'the seat is held until the hand ends',
+	b.table.seats.some((s) => s.seat === cashOutSeat),
+	`${b.table.seats.length} seats`
+);
+
+// The leaver folds when the action reaches them; the other two finish the hand.
+await shoveToShowdown([rejoined, c], 'after cash-out');
+await rejoined.state((t) => !t.seats.some((s) => s.seat === cashOutSeat), 'seat released', 20000);
+check(
+	'the seat is released once the hand settles',
+	rejoined.table.seats.length === seatsBefore - 1
+);
+
+rejoined.socket.close();
+b.socket.close();
+c.socket.close();
+
+// --- Cashing out mid-hand for real money ----------------------------------
+
+// The room only refreshes a stack at settlement, so a player who leaves after
+// betting must be paid for the chips they finished with, not the ones they sat
+// down with. Getting this wrong pays them for money sitting in the pot.
+res = await erik.post('/games?/create', {
+	name: 'Cash out night',
+	realMoney: 'true',
+	vippsBoksCode: 'BOKS777',
+	buyInKr: '500',
+	smallBlind: '10',
+	bigBlind: '20',
+	maxSeats: '6',
+	turnSeconds: '10'
+});
+const cashCode = (res.headers.get('location') ?? '').split('/').pop() ?? '';
+check('create a real-money game for three', res.status === 303 && cashCode.length === 6, cashCode);
+
+const m1 = new Client(cashCode, erik.cookie, 'erik$$');
+const m2 = new Client(cashCode, ola.cookie, 'ola$$');
+const m3 = new Client(cashCode, kari.cookie, 'kari$$');
+const money3 = [m1, m2, m3];
+await Promise.all(money3.map((client) => client.ready));
+
+m1.send({ type: 'sit', seat: 0 });
+await m1.state((t) => t.seats.length === 1, 'first seated');
+m2.send({ type: 'sit', seat: 1 });
+await m2.state((t) => t.seats.length === 2, 'second seated');
+m3.send({ type: 'sit', seat: 2 });
+await Promise.all(money3.map((client) => client.state((t) => t.seats.length === 3, 'all seated')));
+check(
+	'a real-money buy-in is the stack, one chip to the krone',
+	m1.table.seats.every((s) => s.stack === 500),
+	m1.table.seats.map((s) => s.stack).join(',')
+);
+
+m1.send({ type: 'start' });
+await Promise.all(money3.map((client) => client.state((t) => t.handNumber !== null, 'dealt')));
+
+// The big blind has posted 20 and has 480 behind: a fixed, card-independent
+// amount to check the payout against.
+const bbSeat = m1.table.seats.find((s) => s.committed === 20).seat;
+const leaver = money3.find((client) => client.table.you.seat === bbSeat);
+leaver.send({ type: 'leave' });
+await leaver.state((t) => t.you.leaving, 'money leave acknowledged');
+
+await shoveToShowdown(
+	money3.filter((client) => client !== leaver),
+	'money hand'
+);
+await m1.state((t) => !t.seats.some((s) => s.seat === bbSeat), 'leaver cashed out', 20000);
+check(
+	'a player who cashes out mid-hand loses their seat',
+	!m1.table.seats.some((s) => s.seat === bbSeat)
+);
+
+/** Ends the session, retrying while the table keeps dealing new hands. */
+async function endSession(client) {
+	const deadline = Date.now() + 40_000;
+	while (Date.now() < deadline) {
+		client.send({ type: 'end_session' });
+		const ended = await client
+			.state((t) => t.status === 'ended', 'session ended', 4000)
+			.then(() => true)
+			.catch(() => false);
+		if (ended) return true;
+	}
+	return false;
+}
+
+check('the host can close a table someone walked out of', await endSession(m1));
+
+res = await erik.get(`/games/${cashCode}/settlement`);
+const cashSettlement = await res.text();
+check('settlement renders after a mid-hand cash-out', res.status === 200, `status ${res.status}`);
+
+// Three 500 kr buy-ins is 1500 kr in the Boks. Vipps keeps 19 kr per whole
+// thousand, and 1500 holds one, so 1481 kr is left to withdraw.
+check('the boks holds all three buy-ins', cashSettlement.includes('1500,00 kr'), '1500,00 kr');
+check('one whole thousand is charged a fee', cashSettlement.includes('19,00 kr'), '19,00 kr');
+check('the rest is available to withdraw', cashSettlement.includes('1481,00 kr'), '1481,00 kr');
+
+// The heart of it: the leaver posted a 20 blind and folded, so 480 chips is
+// 480 kr. Paying their pre-hand 500 would hand them chips still in the pot.
+// (500,00 kr appears legitimately as everyone's buy-in, so the payout figure
+// is what distinguishes a correct cash-out from an overpaid one.)
+check(
+	'a mid-hand cash-out is priced from the stack the hand left them',
+	cashSettlement.includes('480,00 kr'),
+	'480,00 kr'
+);
+
+money3.forEach((client) => client.socket.close());
+
+// --- The action clock -----------------------------------------------------
+
+// A timed-out fold and a timed-out check are different events, so they get a
+// game each: the fold sits its player out, which would stop the table.
+async function clockGame(name) {
+	const created = await erik.post('/games?/create', {
+		name,
+		realMoney: 'false',
+		smallBlind: '10',
+		bigBlind: '20',
+		startingStack: '1000',
+		maxSeats: '6',
+		turnSeconds: '10'
+	});
+	const gameCode = (created.headers.get('location') ?? '').split('/').pop() ?? '';
+
+	const host = new Client(gameCode, erik.cookie, `${name}-erik`);
+	const guest = new Client(gameCode, ola.cookie, `${name}-ola`);
+	await Promise.all([host.ready, guest.ready]);
+
+	host.send({ type: 'sit', seat: 0 });
+	await host.state((t) => t.seats.length === 1, 'host seated');
+	guest.send({ type: 'sit', seat: 1 });
+	await Promise.all([
+		host.state((t) => t.seats.length === 2, 'host sees two'),
+		guest.state((t) => t.seats.length === 2, 'guest sees two')
+	]);
+
+	host.send({ type: 'start' });
+	await Promise.all([
+		host.state((t) => t.handNumber !== null, 'host dealt'),
+		guest.state((t) => t.handNumber !== null, 'guest dealt')
+	]);
+	return { host, guest };
+}
+
+// Heads-up the button posts the small blind and acts first facing the big
+// blind, so letting the clock run out there can only fold.
+const folding = await clockGame('Clock fold');
+const foldSeat = folding.host.table.toAct;
+await folding.host.state((t) => t.seats.some((s) => s.won > 0), 'timeout fold settled', 25000);
+check(
+	'an unanswered clock folds the hand',
+	folding.host.table.seats.some((s) => s.won > 0),
+	'pot awarded'
+);
+check(
+	'a timed-out fold sits the player out',
+	folding.host.table.seats.find((s) => s.seat === foldSeat).sittingOut === true,
+	`seat ${foldSeat}`
+);
+folding.host.socket.close();
+folding.guest.socket.close();
+
+// The big blind facing a call has a free check, which costs nothing — timing
+// out on it must not remove anyone from the table.
+const checking = await clockGame('Clock check');
+const caller = [checking.host, checking.guest].find((client) => client.table.legal);
+// Heads-up there are only two seats, so the big blind is simply the other one.
+const bigBlindSeat = caller.table.legal.seat === 0 ? 1 : 0;
+caller.send({ type: 'act', action: { type: 'call' } });
+await checking.host.state((t) => t.street === 'flop', 'flop dealt by timeout', 25000);
+check('a free check on the clock advances the street', checking.host.table.street === 'flop');
+check(
+	'a timed-out free check does not sit the player out',
+	checking.host.table.seats.find((s) => s.seat === bigBlindSeat).sittingOut === false,
+	`seat ${bigBlindSeat}`
+);
+checking.host.socket.close();
+checking.guest.socket.close();
 
 log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

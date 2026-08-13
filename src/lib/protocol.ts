@@ -93,7 +93,8 @@ export interface TableView {
 	handNumber: number | null;
 	/** Legal actions, only ever sent to the player actually to act. */
 	legal: LegalActions | null;
-	you: { userId: string; username: string; seat: number | null };
+	/** `leaving` is set once you have asked to cash out of a hand still running. */
+	you: { userId: string; username: string; seat: number | null; leaving: boolean };
 }
 
 export type ServerMessage =

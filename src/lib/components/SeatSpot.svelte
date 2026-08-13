@@ -42,9 +42,10 @@
 				{denominations}
 				size="xs"
 				maxPerColumn={3}
+				maxColumns={3}
 				showTotal={false}
 			/>
-			<span class="font-bold text-gold tabular-nums">{seat.committed}</span>
+			<span class="px-num font-bold text-gold">{seat.committed}</span>
 		{/if}
 	</div>
 {/snippet}
@@ -102,9 +103,23 @@
 				class="size-10 shrink-0 border-2 object-cover {isYou ? 'border-gold' : 'border-edge-hi'}"
 			/>
 
-			<span class="flex min-w-0 flex-1 flex-col items-start">
+			<span class="flex min-w-0 flex-1 flex-col items-start gap-0.5">
 				<span class="w-full truncate text-sm leading-tight font-bold">{seat.username}</span>
-				<ChipStack amount={seat.stack} {denominations} size="xs" maxPerColumn={3} />
+				<!--
+					The pile and the number get a line each. The avatar leaves about
+					70px beside it, and a five-figure stack next to even two columns —
+					each widened by its own ×N label — ran off the side of the plate.
+				-->
+				<ChipStack
+					amount={seat.stack}
+					{denominations}
+					size="xs"
+					maxPerColumn={3}
+					maxColumns={2}
+					showTotal={false}
+				/>
+				<!-- Always drawn, so a busted player reads as 0 rather than blank. -->
+				<span class="px-num w-full truncate text-sm leading-none font-bold">{seat.stack}</span>
 			</span>
 
 			{#if clock !== null}

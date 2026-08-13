@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import * as schema from '../db/schema';
 import type { Action } from '../../poker/engine';
@@ -10,6 +10,14 @@ import { boksFeeOre, chipsToOre, distributePool } from '../settlement';
 /** Delay between a hand finishing and the next one being dealt. */
 const NEXT_HAND_DELAY_MS = 6000;
 
+/**
+ * Consecutive free checks on the clock before a player is sat out.
+ *
+ * A timed-out check costs nothing, so one is not evidence that anybody left —
+ * people look away mid-hand. Three in a row is.
+ */
+const CHECKS_BEFORE_SITTING_OUT = 3;
+
 export interface RoomPlayer {
 	userId: string;
 	username: string;
@@ -17,6 +25,8 @@ export interface RoomPlayer {
 	stack: number;
 	sittingOut: boolean;
 	connections: number;
+	/** Consecutive clock expiries, reset by any action the player takes. */
+	timeouts: number;
 }
 
 export class RoomError extends Error {}
@@ -37,6 +47,10 @@ export class GameRoom {
 	private button = -1;
 	private persistedEvents = 0;
 	private revealedSeats = new Set<number>();
+	/** Players who asked to leave mid-hand, cashed out once it settles. */
+	private leaving = new Set<string>();
+	/** Counts down, handing reactions ids that no stored message can share. */
+	private reactionId = 0;
 	private actionDeadline: number | null = null;
 	private actionTimer: NodeJS.Timeout | null = null;
 	private nextHandTimer: NodeJS.Timeout | null = null;
@@ -73,7 +87,8 @@ export class GameRoom {
 				seat: row.seat,
 				stack: row.stack,
 				sittingOut: row.status === 'sitting_out',
-				connections: 0
+				connections: 0,
+				timeouts: 0
 			});
 		}
 
@@ -118,6 +133,7 @@ export class GameRoom {
 			player.connections++;
 			// Coming back cancels the sit-out that dropping out applied.
 			player.sittingOut = false;
+			player.timeouts = 0;
 		}
 		this.maybeResume();
 	}
@@ -185,7 +201,15 @@ export class GameRoom {
 			}
 		});
 
-		this.players.set(userId, { userId, username, seat, stack, sittingOut: false, connections: 1 });
+		this.players.set(userId, {
+			userId,
+			username,
+			seat,
+			stack,
+			sittingOut: false,
+			connections: 1,
+			timeouts: 0
+		});
 		this.onChange();
 		// Someone joining a running table may be the second player it needed.
 		this.maybeResume();
@@ -245,6 +269,7 @@ export class GameRoom {
 
 		player.stack += topUp;
 		player.sittingOut = false;
+		player.timeouts = 0;
 
 		await this.db.transaction(async (tx) => {
 			await tx
@@ -328,18 +353,49 @@ export class GameRoom {
 		this.onChange();
 	}
 
+	/**
+	 * Cashes a player out and frees their seat.
+	 *
+	 * Leaving in the middle of a hand is queued rather than done on the spot. The
+	 * room's copy of a stack is only refreshed at settlement, so a player who has
+	 * already put chips in this pot still shows their stack from before the deal —
+	 * paying that out would hand them back money that is sitting in the pot. They
+	 * are folded and sat out immediately; the seat and the cash-out follow once
+	 * the hand is settled.
+	 */
 	async leave(userId: string) {
 		const player = this.players.get(userId);
 		if (!player) return;
-		if (this.hand && this.seatIsLive(player.seat)) {
-			// Mid-hand: fold them rather than yanking chips out of a live pot.
-			if (this.hand.toAct === player.seat) await this.act(userId, { type: 'fold' });
+
+		if (this.hand?.seats.some((s) => s.seat === player.seat)) {
+			// Fold rather than yanking chips out of a live pot.
+			if (this.seatIsLive(player.seat) && this.hand.toAct === player.seat) {
+				await this.act(userId, { type: 'fold' });
+			}
 			player.sittingOut = true;
+			this.leaving.add(userId);
 			this.onChange();
 			return;
 		}
 
+		await this.removePlayer(userId);
+	}
+
+	/** Settles up whoever asked to leave while the hand was still running. */
+	private async finishPendingLeaves() {
+		const queued = [...this.leaving];
+		this.leaving.clear();
+		for (const userId of queued) {
+			await this.removePlayer(userId);
+		}
+	}
+
+	private async removePlayer(userId: string) {
+		const player = this.players.get(userId);
+		if (!player) return;
+
 		this.players.delete(userId);
+		this.leaving.delete(userId);
 
 		await this.db.transaction(async (tx) => {
 			await tx
@@ -428,6 +484,8 @@ export class GameRoom {
 		if (this.hand.toAct !== player.seat) throw new RoomError('not_your_turn');
 
 		applyAction(this.hand, player.seat, action);
+		// They are clearly still at the keyboard.
+		player.timeouts = 0;
 		await this.persistNewEvents();
 		this.afterMutation();
 	}
@@ -440,9 +498,19 @@ export class GameRoom {
 		const player = [...this.players.values()].find((p) => p.seat === seat);
 		if (!legal || !player) return;
 
+		const checked = legal.canCheck;
+
 		try {
-			applyAction(this.hand, seat, legal.canCheck ? { type: 'check' } : { type: 'fold' });
-			player.sittingOut = true;
+			applyAction(this.hand, seat, checked ? { type: 'check' } : { type: 'fold' });
+			player.timeouts++;
+
+			// A timed-out fold threw a hand away, so treat it as the player being
+			// gone and stop the blinds eating their stack. A free check cost them
+			// nothing, so only a run of them means the same thing.
+			if (!checked || player.timeouts >= CHECKS_BEFORE_SITTING_OUT) {
+				player.sittingOut = true;
+			}
+
 			await this.persistNewEvents();
 			this.afterMutation();
 		} catch {
@@ -460,6 +528,17 @@ export class GameRoom {
 		}
 
 		if (this.hand && this.hand.toAct !== null) {
+			// Someone who asked to cash out is not coming back to this hand. The
+			// engine has no out-of-turn fold, so it happens the moment the action
+			// reaches them rather than holding the table up for a whole clock.
+			const actor = [...this.players.values()].find((p) => p.seat === this.hand!.toAct);
+			if (actor && this.leaving.has(actor.userId)) {
+				this.actionDeadline = null;
+				this.onChange();
+				this.detach('fold on leave', () => this.act(actor.userId, { type: 'fold' }));
+				return;
+			}
+
 			this.actionDeadline = Date.now() + this.game.turnSeconds * 1000;
 			this.actionTimer = setTimeout(
 				() => this.detach('action timeout', () => this.actOnTimeout()),
@@ -503,6 +582,10 @@ export class GameRoom {
 				})
 				.where(eq(schema.hand.id, this.handId!));
 		});
+
+		// Stacks are current now, so anyone who asked to leave mid-hand can be paid
+		// out at what they actually finished with.
+		await this.finishPendingLeaves();
 
 		this.onChange();
 
@@ -553,29 +636,59 @@ export class GameRoom {
 	 * @param username taken from the connection rather than the seated players,
 	 *   so someone watching from the rail still posts under their own name
 	 */
-	async chat(
-		userId: string,
-		username: string,
-		body: string,
-		kind: 'chat' | 'reaction' = 'chat'
-	): Promise<ChatView> {
+	async chat(userId: string, username: string, body: string): Promise<ChatView> {
 		const trimmed = body.trim().slice(0, 500);
 		if (!trimmed) throw new RoomError('empty_message');
-		// Reactions come from a fixed set, so a client cannot smuggle arbitrary
-		// content through the reaction path and have it rendered differently.
-		if (kind === 'reaction' && !REACTIONS.includes(trimmed as (typeof REACTIONS)[number])) {
-			throw new RoomError('unknown_reaction');
-		}
 
 		const [row] = await this.db
 			.insert(schema.chatMessage)
-			.values({ gameId: this.game.id, userId, kind, body: trimmed })
+			.values({ gameId: this.game.id, userId, kind: 'chat', body: trimmed })
 			.returning();
 
-		return { id: row.id, userId, username, kind, body: trimmed, at: row.createdAt.getTime() };
+		return {
+			id: row.id,
+			userId,
+			username,
+			kind: 'chat',
+			body: trimmed,
+			at: row.createdAt.getTime()
+		};
 	}
 
-	/** Recent chat, oldest first, so a joining client can render the backlog. */
+	/**
+	 * Broadcasts a reaction without keeping it.
+	 *
+	 * A reaction is a moment over a seat, and both the live path and the backlog
+	 * already threw them away before rendering — so the stored rows were read by
+	 * nothing. Worse, they shared the chat backlog's row limit, so a run of emoji
+	 * could push every real message out of what a joining player sees.
+	 */
+	reaction(userId: string, username: string, emoji: string): ChatView {
+		const trimmed = emoji.trim();
+		// Reactions come from a fixed set, so a client cannot smuggle arbitrary
+		// content through the reaction path and have it rendered differently.
+		if (!REACTIONS.includes(trimmed as (typeof REACTIONS)[number])) {
+			throw new RoomError('unknown_reaction');
+		}
+
+		// Negative, so a transient id can never collide with a chat_message row's.
+		return {
+			id: --this.reactionId,
+			userId,
+			username,
+			kind: 'reaction',
+			body: trimmed,
+			at: Date.now()
+		};
+	}
+
+	/**
+	 * Recent chat, oldest first, so a joining client can render the backlog.
+	 *
+	 * Reactions are excluded rather than filtered afterwards: games played before
+	 * they stopped being stored still have rows here, and letting them fill the
+	 * window would hand a joining player an empty conversation.
+	 */
 	async recentChat(limit = 50): Promise<ChatView[]> {
 		const rows = await this.db
 			.select({
@@ -588,7 +701,9 @@ export class GameRoom {
 			})
 			.from(schema.chatMessage)
 			.leftJoin(schema.user, eq(schema.user.id, schema.chatMessage.userId))
-			.where(eq(schema.chatMessage.gameId, this.game.id))
+			.where(
+				and(eq(schema.chatMessage.gameId, this.game.id), ne(schema.chatMessage.kind, 'reaction'))
+			)
 			.orderBy(desc(schema.chatMessage.createdAt))
 			.limit(limit);
 
@@ -675,7 +790,7 @@ export class GameRoom {
 			actionDeadline: this.actionDeadline,
 			handNumber: hand ? this.handNumber : null,
 			legal: myTurn ? legalActions(hand) : null,
-			you: { userId, username, seat: me?.seat ?? null }
+			you: { userId, username, seat: me?.seat ?? null, leaving: this.leaving.has(userId) }
 		};
 	}
 }

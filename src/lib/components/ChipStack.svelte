@@ -6,6 +6,7 @@
 		denominations,
 		size = 'md',
 		maxPerColumn = 4,
+		maxColumns = Number.POSITIVE_INFINITY,
 		showTotal = true
 	}: {
 		amount: number;
@@ -13,6 +14,8 @@
 		size?: 'xs' | 'sm' | 'md';
 		/** How tall a single column is drawn; the count stays exact. */
 		maxPerColumn?: number;
+		/** How many colours are drawn, cheapest dropped first. */
+		maxColumns?: number;
 		showTotal?: boolean;
 	} = $props();
 
@@ -27,14 +30,16 @@
 
 	const SIZES = { xs: 11, sm: 15, md: 20 } as const;
 
-	const columns = $derived(drawablePile(breakdown(amount, denominations), maxPerColumn));
+	const columns = $derived(
+		drawablePile(breakdown(amount, denominations), maxPerColumn, maxColumns)
+	);
 	const px = $derived(SIZES[size]);
 	/** Chips overlap so a column reads as a stack, but stay individually visible. */
 	const overlap = $derived(Math.round(px * 0.55));
 </script>
 
 {#if amount > 0}
-	<span class="inline-flex items-end gap-1">
+	<span class="inline-flex max-w-full items-end gap-1">
 		{#each columns as column (column.value)}
 			{@const colors = TIER_COLORS[Math.min(column.tier, TIER_COLORS.length - 1)]}
 			<span
@@ -43,9 +48,7 @@
 			>
 				{#if column.count > column.drawn}
 					<!-- The pile is capped for space, so say how many there really are. -->
-					<span class="mt-0.5 text-[0.7rem] leading-none text-muted tabular-nums"
-						>×{column.count}</span
-					>
+					<span class="px-num mt-0.5 text-[0.7rem] leading-none text-muted">×{column.count}</span>
 				{/if}
 				{#each Array.from({ length: column.drawn }, (_, i) => i) as index (index)}
 					<!-- 8x8 grid: an octagon body with four edge marks and a hollow centre. -->
@@ -79,7 +82,7 @@
 		{/each}
 
 		{#if showTotal}
-			<span class="ml-1 text-sm leading-none font-bold tabular-nums">{amount}</span>
+			<span class="px-num ml-1 text-sm leading-none font-bold">{amount}</span>
 		{/if}
 	</span>
 {/if}

@@ -169,4 +169,20 @@
 		font-family: var(--font-arcade);
 		letter-spacing: 0.02em;
 	}
+
+	/*
+	 * Any number a player has to read exactly: stacks, bets, pots, money.
+	 *
+	 * Pixelify Sans draws 2, 5 and 8 with nearly the same pixels at the sizes a
+	 * stack is printed at, and misreading a stack at a poker table is a real
+	 * problem. Press Start 2P separates them clearly. It also runs about a fifth
+	 * larger at a given size, hence the compensation — matched by eye against
+	 * adjacent body text rather than by metrics.
+	 */
+	.px-num {
+		font-family: var(--font-arcade);
+		font-size: 0.82em;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.04em;
+	}
 }

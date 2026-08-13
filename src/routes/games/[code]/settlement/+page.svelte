@@ -41,15 +41,15 @@
 		<section class="px-panel flex flex-col gap-1 p-4">
 			<div class="flex items-baseline justify-between gap-3">
 				<span class="text-sm text-muted">{m.settle_in_boks()}</span>
-				<span class="font-medium tabular-nums">{formatOre(data.paidInOre)}</span>
+				<span class="px-num font-medium">{formatOre(data.paidInOre)}</span>
 			</div>
 			<div class="flex items-baseline justify-between gap-3">
 				<span class="text-sm text-muted">{m.settle_fee()}</span>
-				<span class="font-medium text-danger tabular-nums">−{formatOre(data.feeOre)}</span>
+				<span class="px-num font-medium text-danger">−{formatOre(data.feeOre)}</span>
 			</div>
 			<div class="mt-1 flex items-baseline justify-between gap-3 border-t-2 border-edge pt-2">
 				<span class="text-sm font-medium">{m.settle_available()}</span>
-				<span class="text-lg font-semibold tabular-nums">{formatOre(data.payoutOre)}</span>
+				<span class="px-num text-lg font-semibold">{formatOre(data.payoutOre)}</span>
 			</div>
 			<p class="mt-1 text-xs text-muted">{m.settle_fee_hint()}</p>
 		</section>
@@ -66,7 +66,7 @@
 					{#each withdrawals as line (line.userId)}
 						<li class="px-panel flex items-center justify-between gap-3 p-4">
 							<span class="min-w-0 truncate font-medium">{line.username}</span>
-							<span class="shrink-0 text-xl font-semibold tabular-nums">
+							<span class="px-num shrink-0 text-xl font-semibold">
 								{formatOre(line.paidOutOre)}
 							</span>
 						</li>
@@ -94,7 +94,7 @@
 							</span>
 						</span>
 						<span
-							class="shrink-0 font-semibold tabular-nums"
+							class="px-num shrink-0 font-semibold"
 							class:text-success={line.netOre > 0}
 							class:text-danger={line.netOre < 0}
 						>

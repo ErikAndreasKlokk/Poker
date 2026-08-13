@@ -91,9 +91,19 @@ export interface DrawnColumn extends ChipColumn {
  * Capping the pile as a whole instead would spend the entire budget on the top
  * denomination, so a 990 stack would render as four identical chips and lose
  * the colour mix that makes one pile readably bigger than another.
+ *
+ * @param maxColumns how many colours may be drawn at all, highest value first.
+ *   A seat plate is only so wide, and four columns plus the total overflow it.
+ *   The dropped colours are always the cheapest ones, so what is left still
+ *   accounts for nearly all of the pile — and the exact amount is printed
+ *   beside it either way.
  */
-export function drawablePile(columns: readonly ChipColumn[], maxPerColumn: number): DrawnColumn[] {
-	return columns.map((column) => ({
+export function drawablePile(
+	columns: readonly ChipColumn[],
+	maxPerColumn: number,
+	maxColumns = Number.POSITIVE_INFINITY
+): DrawnColumn[] {
+	return columns.slice(0, Math.max(1, maxColumns)).map((column) => ({
 		...column,
 		drawn: Math.max(1, Math.min(column.count, maxPerColumn))
 	}));

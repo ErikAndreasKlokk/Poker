@@ -158,7 +158,7 @@ export function attachGameServer(server: Server, db: Db) {
 					return broadcast(code, { type: 'chat', message: posted });
 				}
 				case 'reaction': {
-					const posted = await room.chat(client.userId, client.username, message.emoji, 'reaction');
+					const posted = room.reaction(client.userId, client.username, message.emoji);
 					return broadcast(code, { type: 'chat', message: posted });
 				}
 				default:

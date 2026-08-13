@@ -81,7 +81,7 @@ back and a fresh hand deals.
 ### Money
 
 - **One chip is one krone.** A real-money game has no separate stack setting —
-  the buy-in *is* the stack, so a chip is worth exactly 100 øre and nothing
+  the buy-in _is_ the stack, so a chip is worth exactly 100 øre and nothing
   rounds away. Blinds are in kroner too.
 - Amounts are integer **øre** everywhere. Never floats.
 - The Boks is the pot: buy-ins are paid in, winnings withdrawn. Nobody can owe
@@ -130,7 +130,7 @@ card visibility, the money path. **It needs an empty user table and an unused
 - Paths containing `[code]` break PowerShell globbing; use the Edit tool or the
   Grep tool instead of `Select-String -Path`.
 - `src/lib/paraglide` is generated at build time and gitignored. `svelte-kit
-  sync` does not create it — run a build before `npm run check` on a fresh
+sync` does not create it — run a build before `npm run check` on a fresh
   clone, or the message imports will not resolve.
 - There is **no `svelte.config.js`**. This toolchain configures the adapter
   inside `sveltekit()` in `vite.config.ts`.

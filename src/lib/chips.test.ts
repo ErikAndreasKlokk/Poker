@@ -111,4 +111,22 @@ describe('drawablePile', () => {
 	it('always draws at least one chip per column it keeps', () => {
 		expect(drawablePile(columns, 0).every((column) => column.drawn === 1)).toBe(true);
 	});
+
+	it('keeps every colour when no column limit is given', () => {
+		expect(drawablePile(columns, 4)).toHaveLength(3);
+	});
+
+	it('drops the cheapest colours when the space only fits a few', () => {
+		// A seat plate fits two columns beside the avatar.
+		const drawn = drawablePile(columns, 3, 2);
+		expect(drawn.map((column) => column.value)).toEqual([100, 50]);
+	});
+
+	it('still draws one column when asked for none', () => {
+		expect(drawablePile(columns, 3, 0)).toHaveLength(1);
+	});
+
+	it('does not invent columns a pile does not have', () => {
+		expect(drawablePile(columns, 3, 10)).toHaveLength(3);
+	});
 });
