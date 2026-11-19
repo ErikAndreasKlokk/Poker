@@ -195,6 +195,7 @@
 
 	"error_not_your_game": "Du var ikke med i dette spillet.",
 	"error_no_such_hand": "Fant ikke den hånden.",
+	"error_hand_in_progress": "Den hånden spilles fortsatt. Reprisen åpner når den er ferdig.",
 	"error_unsupported_locale": "Ukjent språk.",
 	"error_not_found": "Fant ikke siden.",
 	"error_unexpected": "Noe gikk galt.",

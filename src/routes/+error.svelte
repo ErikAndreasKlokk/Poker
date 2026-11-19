@@ -9,6 +9,7 @@
 		game_not_found: m.error_game_not_found,
 		not_your_game: m.error_not_your_game,
 		no_such_hand: m.error_no_such_hand,
+		hand_in_progress: m.error_hand_in_progress,
 		unsupported_locale: m.error_unsupported_locale
 	};
 

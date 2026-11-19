@@ -195,6 +195,7 @@
 
 	"error_not_your_game": "You weren't part of this game.",
 	"error_no_such_hand": "That hand doesn't exist.",
+	"error_hand_in_progress": "That hand is still being played. The replay opens when it's over.",
 	"error_unsupported_locale": "Unknown language.",
 	"error_not_found": "Page not found.",
 	"error_unexpected": "Something went wrong.",
